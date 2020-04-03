@@ -1,0 +1,7 @@
+C:\Users\lorin\source\NeutrinoSDK\NeutrinoSDK\BytecodeAssembler\bin\Debug\ntrasm.exe.config
+C:\Users\lorin\source\NeutrinoSDK\NeutrinoSDK\BytecodeAssembler\bin\Debug\ntrasm.exe
+C:\Users\lorin\source\NeutrinoSDK\NeutrinoSDK\BytecodeAssembler\bin\Debug\ntrasm.pdb
+C:\Users\lorin\source\NeutrinoSDK\NeutrinoSDK\BytecodeAssembler\obj\Debug\BytecodeAssembler.csprojAssemblyReference.cache
+C:\Users\lorin\source\NeutrinoSDK\NeutrinoSDK\BytecodeAssembler\obj\Debug\BytecodeAssembler.csproj.CoreCompileInputs.cache
+C:\Users\lorin\source\NeutrinoSDK\NeutrinoSDK\BytecodeAssembler\obj\Debug\ntrasm.exe
+C:\Users\lorin\source\NeutrinoSDK\NeutrinoSDK\BytecodeAssembler\obj\Debug\ntrasm.pdb
