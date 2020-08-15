@@ -29,7 +29,7 @@ namespace BytecodeAssembler
                 {
                     if (args[0] == "-help")
                     {
-                        Console.WriteLine("Usage:\nntrasm <inputFile> [outputFile] [-options]\nOptions:\n-genRelocTable: include symbol table in NEX header (for dynamic linking support)\n-genModuleFile: create module descriptor file alongside main executable (for dynamically linking the file and accessing its symbols from another project)\n-silent: silent mode, does not write to console output\nfor more info visit lorinet.rf.gd/neutrino/docs/ntrasm");
+                        Console.WriteLine("Usage:\nntrasm <inputFile> [outputFile] [-options]\nOptions:\n-genRelocTable: include symbol table in NEX header (for dynamic linking support)\n-genModuleFile: create module descriptor file alongside main executable (for dynamically linking the file and accessing its symbols from another project)\n-silent: silent mode, does not write to console output\n-verbose: show compilation line-by-line\nfor more info visit lorinet.rf.gd/neutrino/docs/ntrasm");
                         Environment.Exit((int)NError.InvalidUsage);
                     }
                     else
@@ -82,9 +82,9 @@ namespace BytecodeAssembler
                 sw.Start();
                 List<string> code = new List<string>();
                 if (File.Exists(source))
-                    code = new List<string>(File.ReadAllLines(source));
+                    code = new List<string>(File.ReadAllLines(source, Encoding.GetEncoding(1252)));
                 else if (File.Exists(Path.Combine(IncludePath, source)))
-                    code = new List<string>(File.ReadAllLines(Path.Combine(IncludePath, source)));
+                    code = new List<string>(File.ReadAllLines(Path.Combine(IncludePath, source), Encoding.GetEncoding(1252)));
                 else
                 {
                     RageQuit(NError.SourceMissing, "Cannot open source file: " + source);
@@ -108,9 +108,9 @@ namespace BytecodeAssembler
                 {
                     string[] includedCode = new string[0];
                     if (File.Exists(s))
-                        includedCode = File.ReadAllLines(s);
+                        includedCode = File.ReadAllLines(s, Encoding.GetEncoding(1252));
                     else if (File.Exists(Path.Combine(IncludePath, s)))
-                        includedCode = File.ReadAllLines(Path.Combine(IncludePath, s));
+                        includedCode = File.ReadAllLines(Path.Combine(IncludePath, s), Encoding.GetEncoding(1252));
                     else
                     {
                         RageQuit(NError.IncludeMissing, "Cannot open included file '" + s + "'");
@@ -215,6 +215,28 @@ namespace BytecodeAssembler
                         }
                         code[i] = "extcall " + oi + " " + si;
                     }
+                    else if(code[i].StartsWith("extmovl"))
+                    {
+                        string sym = code[i].Split(' ')[1];
+                        string lv = code[i].Split(' ')[2];
+                        int si = 0;
+                        int oi = 0;
+                        bool found = false;
+                        foreach (var v in extmtds)
+                        {
+                            if (v.Value.ContainsKey(sym))
+                            {
+                                si = v.Value[sym];
+                                oi = v.Key.Value;
+                                found = true;
+                            }
+                        }
+                        if (!found)
+                        {
+                            RageQuit(NError.SymbolMissing, "Symbol not found: " + sym);
+                        }
+                        code[i] = "extmovl " + oi + " " + si + " " + lv;
+                    }
                 }
                 Dictionary<string, List<string>> sections = new Dictionary<string, List<string>>();
                 bool sec = true;
@@ -265,7 +287,7 @@ namespace BytecodeAssembler
                             if (spl.Length > 1)
                             {
                                 string lbl = spl[1].Replace(":", "");
-                                if (cl.StartsWith("jmp") || cl.StartsWith("call") || cl.StartsWith("goto") || cl.StartsWith("jz") || cl.StartsWith("jnz") || cl.StartsWith("jeq") || cl.StartsWith("jne") || cl.StartsWith("jlt") || cl.StartsWith("jgt") || cl.StartsWith("jle") || cl.StartsWith("jge") || cl.StartsWith("movl"))
+                                if (cl.StartsWith("jmp") || cl.StartsWith("call") || cl.StartsWith("goto") || cl.StartsWith("jz") || cl.StartsWith("jnz") || cl.StartsWith("jeq") || cl.StartsWith("jne") || cl.StartsWith("jlt") || cl.StartsWith("jgt") || cl.StartsWith("jle") || cl.StartsWith("jge") || cl.StartsWith("movl") || cl.StartsWith("lj") || cl.StartsWith("lje") || cl.StartsWith("ljne") || cl.StartsWith("ljg") || cl.StartsWith("ljl") || cl.StartsWith("ljle") || cl.StartsWith("ljge"))
                                 {
                                     if (!executedSections.Contains(lbl))
                                     {
@@ -336,6 +358,10 @@ namespace BytecodeAssembler
                 Console.ResetColor();
                 foreach (string s in executedCode)
                 {
+                    if(flags.Contains("-verbose"))
+                    {
+                        Console.WriteLine(s);
+                    }
                     string[] arg = s.Split(' ');
                     string op = arg[0].ToLower();
                     if (op == "nop")
@@ -440,21 +466,27 @@ namespace BytecodeAssembler
                             vi += 1;
                         }
                         pcode.Add((byte)OpCode.ST);
-                        if (s[5 + arg[1].Length] == '"')
+                        if (arg[2] == "\"\"")
+                        {
+                            pcode.AddRange(BitConverter.GetBytes(4));
+                            pcode.AddRange(BitConverter.GetBytes(vars[arg[1]]));
+                        }
+                        else if (s[5 + arg[1].Length] == '"')
                         {
                             string val = "";
                             for (int i = 6 + arg[1].Length; i < s.Length - 1; i++)
                             {
-                                if (i == s.Replace("\\0", "\0").Replace("\\n", "\n").Length)
+                                if (i == s.Length)
                                 {
                                     val = val.Remove(val.Length - 1, 1);
                                     break;
                                 }
-                                val += s.Replace("\\0", "\0").Replace("\\n", "\n")[i];
+                                val += s[i];
                             }
+                            val = val.Replace("\\0", "\0").Replace("\\n", "\n").Replace("\\\n", "\\n");
                             pcode.AddRange(BitConverter.GetBytes(4 + val.Length));
                             pcode.AddRange(BitConverter.GetBytes(vars[arg[1]]));
-                            pcode.AddRange(Encoding.ASCII.GetBytes(val));
+                            pcode.AddRange(Encoding.GetEncoding(1252).GetBytes(val));
                         }
                         else
                         {
@@ -810,7 +842,7 @@ namespace BytecodeAssembler
                             }
                             pcode.AddRange(BitConverter.GetBytes(4 + val.Length));
                             pcode.AddRange(BitConverter.GetBytes(vars[arg[1]]));
-                            pcode.AddRange(Encoding.ASCII.GetBytes(val));
+                            pcode.AddRange(Encoding.GetEncoding(1252).GetBytes(val));
                         }
                         else
                         {
@@ -999,6 +1031,11 @@ namespace BytecodeAssembler
                         {
                             value = int.Parse(s.Remove(0, 6 + arg[1].Length), System.Globalization.NumberStyles.HexNumber);
                         }
+                        if (!vars.ContainsKey(arg[1]))
+                        {
+                            vars.Add(arg[1], vi);
+                            vi += 1;
+                        }
                         pcode.AddRange(BitConverter.GetBytes(vars[arg[1]]));
                         pcode.AddRange(BitConverter.GetBytes(value));
                     }
@@ -1009,6 +1046,11 @@ namespace BytecodeAssembler
                         if (!int.TryParse(s.Remove(0, 6 + arg[1].Length), out value))
                         {
                             value = int.Parse(s.Remove(0, 5 + arg[1].Length), System.Globalization.NumberStyles.HexNumber);
+                        }
+                        if (!vars.ContainsKey(arg[1]))
+                        {
+                            vars.Add(arg[1], vi);
+                            vi += 1;
                         }
                         pcode.AddRange(BitConverter.GetBytes(vars[arg[1]]));
                         pcode.AddRange(BitConverter.GetBytes(value));
@@ -1021,6 +1063,11 @@ namespace BytecodeAssembler
                         {
                             value = int.Parse(s.Remove(0, 6 + arg[1].Length), System.Globalization.NumberStyles.HexNumber);
                         }
+                        if (!vars.ContainsKey(arg[1]))
+                        {
+                            vars.Add(arg[1], vi);
+                            vi += 1;
+                        }
                         pcode.AddRange(BitConverter.GetBytes(vars[arg[1]]));
                         pcode.AddRange(BitConverter.GetBytes(value));
                     }
@@ -1031,6 +1078,11 @@ namespace BytecodeAssembler
                         if (!int.TryParse(s.Remove(0, 6 + arg[1].Length), out value))
                         {
                             value = int.Parse(s.Remove(0, 6 + arg[1].Length), System.Globalization.NumberStyles.HexNumber);
+                        }
+                        if (!vars.ContainsKey(arg[1]))
+                        {
+                            vars.Add(arg[1], vi);
+                            vi += 1;
                         }
                         pcode.AddRange(BitConverter.GetBytes(vars[arg[1]]));
                         pcode.AddRange(BitConverter.GetBytes(value));
@@ -1103,7 +1155,7 @@ namespace BytecodeAssembler
                             }
                             pcode.AddRange(BitConverter.GetBytes(4 + val.Length));
                             pcode.AddRange(BitConverter.GetBytes(vars[arg[1]]));
-                            pcode.AddRange(Encoding.ASCII.GetBytes(val));
+                            pcode.AddRange(Encoding.GetEncoding(1252).GetBytes(val));
                         }
                         else
                         {
@@ -1315,9 +1367,69 @@ namespace BytecodeAssembler
                     else if (op == "lj")
                     {
                         arg[1] = arg[1].Replace(":", "");
-                        if (labels.ContainsKey(args[1]))
+                        if (labels.ContainsKey(arg[1]))
                         {
                             pcode.Add((byte)OpCode.LJ);
+                            pcode.AddRange(BitConverter.GetBytes(labels[arg[1]]));
+                        }
+                        else RageQuit(NError.LabelMissing, "Label not found: " + arg[1]);
+                    }
+                    else if (op == "lje")
+                    {
+                        arg[1] = arg[1].Replace(":", "");
+                        if (labels.ContainsKey(arg[1]))
+                        {
+                            pcode.Add((byte)OpCode.LJE);
+                            pcode.AddRange(BitConverter.GetBytes(labels[arg[1]]));
+                        }
+                        else RageQuit(NError.LabelMissing, "Label not found: " + arg[1]);
+                    }
+                    else if (op == "ljne")
+                    {
+                        arg[1] = arg[1].Replace(":", "");
+                        if (labels.ContainsKey(arg[1]))
+                        {
+                            pcode.Add((byte)OpCode.LJNE);
+                            pcode.AddRange(BitConverter.GetBytes(labels[arg[1]]));
+                        }
+                        else RageQuit(NError.LabelMissing, "Label not found: " + arg[1]);
+                    }
+                    else if (op == "ljg")
+                    {
+                        arg[1] = arg[1].Replace(":", "");
+                        if (labels.ContainsKey(arg[1]))
+                        {
+                            pcode.Add((byte)OpCode.LJG);
+                            pcode.AddRange(BitConverter.GetBytes(labels[arg[1]]));
+                        }
+                        else RageQuit(NError.LabelMissing, "Label not found: " + arg[1]);
+                    }
+                    else if (op == "ljl")
+                    {
+                        arg[1] = arg[1].Replace(":", "");
+                        if (labels.ContainsKey(arg[1]))
+                        {
+                            pcode.Add((byte)OpCode.LJL);
+                            pcode.AddRange(BitConverter.GetBytes(labels[arg[1]]));
+                        }
+                        else RageQuit(NError.LabelMissing, "Label not found: " + arg[1]);
+                    }
+                    else if (op == "ljle")
+                    {
+                        arg[1] = arg[1].Replace(":", "");
+                        if (labels.ContainsKey(arg[1]))
+                        {
+                            pcode.Add((byte)OpCode.LJLE);
+                            pcode.AddRange(BitConverter.GetBytes(labels[arg[1]]));
+                        }
+                        else RageQuit(NError.LabelMissing, "Label not found: " + arg[1]);
+                    }
+                    else if (op == "ljge")
+                    {
+                        arg[1] = arg[1].Replace(":", "");
+                        if (labels.ContainsKey(arg[1]))
+                        {
+                            pcode.Add((byte)OpCode.LJGE);
                             pcode.AddRange(BitConverter.GetBytes(labels[arg[1]]));
                         }
                         else RageQuit(NError.LabelMissing, "Label not found: " + arg[1]);
@@ -1344,7 +1456,7 @@ namespace BytecodeAssembler
                             }
                             pcode.AddRange(BitConverter.GetBytes(1 + val.Length));
                             pcode.Add(interrupt);
-                            pcode.AddRange(Encoding.ASCII.GetBytes(val));
+                            pcode.AddRange(Encoding.GetEncoding(1252).GetBytes(val));
                         }
                         else
                         {
@@ -1460,15 +1572,16 @@ namespace BytecodeAssembler
                         {
                             for (int i = 7; i < s.Length - 1; i++)
                             {
-                                if (i == s.Replace("\\0", "\0").Replace("\\n", "\n").Length)
+                                if (i == s.Length)
                                 {
                                     val = val.Remove(val.Length - 1, 1);
                                     break;
                                 }
-                                val += s.Replace("\\0", "\0").Replace("\\n", "\n")[i];
+                                val += s[i];
                             }
+                            val = val.Replace("\\0", "\0").Replace("\\n", "\n").Replace("\\\n", "\\n");
                             pcode.AddRange(BitConverter.GetBytes(val.Length));
-                            pcode.AddRange(Encoding.ASCII.GetBytes(val));
+                            pcode.AddRange(Encoding.GetEncoding(1252).GetBytes(val));
                         }
                         else
                         {
@@ -1489,13 +1602,25 @@ namespace BytecodeAssembler
                     {
                         pcode.Add((byte)OpCode.LINK);
                         pcode.Add((byte)arg[1].Length);
-                        pcode.AddRange(Encoding.ASCII.GetBytes(arg[1]));
+                        pcode.AddRange(Encoding.GetEncoding(1252).GetBytes(arg[1]));
                     }
                     else if (op == "extcall")
                     {
                         pcode.Add((byte)OpCode.EXTCALL);
                         pcode.AddRange(BitConverter.GetBytes(int.Parse(arg[1])));
                         pcode.AddRange(BitConverter.GetBytes(int.Parse(arg[2])));
+                    }
+                    else if(op == "extmovl")
+                    {
+                        pcode.Add((byte)OpCode.EXTMOVL);
+                        pcode.AddRange(BitConverter.GetBytes(int.Parse(arg[1])));
+                        pcode.AddRange(BitConverter.GetBytes(int.Parse(arg[2])));
+                        if (!vars.ContainsKey(arg[3]))
+                        {
+                            vars.Add(arg[3], vi);
+                            vi += 1;
+                        }
+                        pcode.AddRange(BitConverter.GetBytes(vars[arg[3]]));
                     }
                     else if (op == "halt" || op == "leave")
                     {
@@ -1519,7 +1644,7 @@ namespace BytecodeAssembler
                 Console.ResetColor();
                 Environment.Exit(0);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 RageQuit(NError.CompilerError, "Compiler error: " + ex.ToString());
             }
@@ -1534,9 +1659,9 @@ namespace BytecodeAssembler
             if(!includes.Contains(file)) includes.Add(file);
             string[] c = null;
             if (File.Exists(file))
-                c = File.ReadAllLines(file);
+                c = File.ReadAllLines(file, Encoding.GetEncoding(1252));
             else if (File.Exists(Path.Combine(IncludePath, file)))
-                c = File.ReadAllLines(Path.Combine(IncludePath, file));
+                c = File.ReadAllLines(Path.Combine(IncludePath, file), Encoding.GetEncoding(1252));
             else
             {
                 RageQuit(NError.IncludeMissing, "Cannot open included file '" + file + "'");
@@ -1643,8 +1768,15 @@ namespace BytecodeAssembler
         SJG = 0x73,
         SJZ = 0x74,
         SJNZ = 0x75,
-        VAL = 0x76,
-        VAS = 0x77,
+        VAL = 0x76, // array length
+        VAS = 0x77, // array set index
+        EXTMOVL = 0x78,
+        LJL = 0x79,
+        LJG = 0x7A,
+        LJE = 0x7B,
+        LJNE = 0x7C,
+        LJGE = 0x7D,
+        LJLE = 0x7E,
         INTS = 0x80,
         INT = 0x81,
         BREAK = 0x82,

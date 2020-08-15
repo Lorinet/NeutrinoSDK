@@ -37,6 +37,15 @@ namespace NeutrinoUIDesigner
             {
                 el.SetProperty("Selectable", "1");
             }
+            if(TypeBox.Text == "Label" || TypeBox.Text == "TextField")
+            {
+                if (BorderBox.Checked) el.SetProperty("Border", "1");
+                else el.SetProperty("Border", "0");
+            }
+            if(TypeBox.Text == "ListView")
+            {
+                el.SetProperty("Items", itemsBox.Text.Replace("\r", "").Replace("\n", ",") + ",");
+            }
             ResultingElement = el.Serialize();
             DialogResult = DialogResult.OK;
             Close();
@@ -45,11 +54,6 @@ namespace NeutrinoUIDesigner
         private void button1_Click(object sender, EventArgs e)
         {
             Close();
-        }
-
-        private void FontBox_SelectedIndexChanged(object sender, EventArgs e)
-        {
-
         }
     }
 }

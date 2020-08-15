@@ -34,7 +34,7 @@
             this.labelCopyright = new System.Windows.Forms.Label();
             this.labelCompanyName = new System.Windows.Forms.Label();
             this.okButton = new System.Windows.Forms.Button();
-            this.DescritpionBox = new System.Windows.Forms.TextBox();
+            this.DescriptionBox = new System.Windows.Forms.TextBox();
             this.tableLayoutPanel.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.logoPictureBox)).BeginInit();
             this.SuspendLayout();
@@ -50,7 +50,7 @@
             this.tableLayoutPanel.Controls.Add(this.labelCopyright, 1, 2);
             this.tableLayoutPanel.Controls.Add(this.labelCompanyName, 1, 3);
             this.tableLayoutPanel.Controls.Add(this.okButton, 1, 5);
-            this.tableLayoutPanel.Controls.Add(this.DescritpionBox, 1, 4);
+            this.tableLayoutPanel.Controls.Add(this.DescriptionBox, 1, 4);
             this.tableLayoutPanel.Dock = System.Windows.Forms.DockStyle.Fill;
             this.tableLayoutPanel.Location = new System.Drawing.Point(9, 9);
             this.tableLayoutPanel.Name = "tableLayoutPanel";
@@ -94,18 +94,20 @@
             // labelVersion
             // 
             this.labelVersion.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.labelVersion.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.labelVersion.Location = new System.Drawing.Point(143, 26);
             this.labelVersion.Margin = new System.Windows.Forms.Padding(6, 0, 3, 0);
             this.labelVersion.MaximumSize = new System.Drawing.Size(0, 17);
             this.labelVersion.Name = "labelVersion";
             this.labelVersion.Size = new System.Drawing.Size(271, 17);
             this.labelVersion.TabIndex = 0;
-            this.labelVersion.Text = "Version 1.0";
+            this.labelVersion.Text = "Version 1.0.1f";
             this.labelVersion.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             // 
             // labelCopyright
             // 
             this.labelCopyright.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.labelCopyright.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.labelCopyright.Location = new System.Drawing.Point(143, 52);
             this.labelCopyright.Margin = new System.Windows.Forms.Padding(6, 0, 3, 0);
             this.labelCopyright.MaximumSize = new System.Drawing.Size(0, 17);
@@ -118,13 +120,14 @@
             // labelCompanyName
             // 
             this.labelCompanyName.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.labelCompanyName.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.labelCompanyName.Location = new System.Drawing.Point(143, 78);
             this.labelCompanyName.Margin = new System.Windows.Forms.Padding(6, 0, 3, 0);
             this.labelCompanyName.MaximumSize = new System.Drawing.Size(0, 17);
             this.labelCompanyName.Name = "labelCompanyName";
             this.labelCompanyName.Size = new System.Drawing.Size(271, 17);
             this.labelCompanyName.TabIndex = 22;
-            this.labelCompanyName.Text = "2019, Lorinet Software";
+            this.labelCompanyName.Text = "2020, Lorinet Software";
             this.labelCompanyName.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             // 
             // okButton
@@ -138,14 +141,14 @@
             this.okButton.Text = "&OK";
             this.okButton.Click += new System.EventHandler(this.okButton_Click);
             // 
-            // DescritpionBox
+            // DescriptionBox
             // 
-            this.DescritpionBox.Location = new System.Drawing.Point(140, 107);
-            this.DescritpionBox.Multiline = true;
-            this.DescritpionBox.Name = "DescritpionBox";
-            this.DescritpionBox.ReadOnly = true;
-            this.DescritpionBox.Size = new System.Drawing.Size(274, 126);
-            this.DescritpionBox.TabIndex = 25;
+            this.DescriptionBox.Location = new System.Drawing.Point(140, 107);
+            this.DescriptionBox.Multiline = true;
+            this.DescriptionBox.Name = "DescriptionBox";
+            this.DescriptionBox.ReadOnly = true;
+            this.DescriptionBox.Size = new System.Drawing.Size(274, 126);
+            this.DescriptionBox.TabIndex = 25;
             // 
             // AboutWindow
             // 
@@ -163,6 +166,7 @@
             this.ShowInTaskbar = false;
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
             this.Text = "AboutWindow";
+            this.Load += new System.EventHandler(this.AboutWindow_Load);
             this.tableLayoutPanel.ResumeLayout(false);
             this.tableLayoutPanel.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.logoPictureBox)).EndInit();
@@ -179,6 +183,6 @@
         private System.Windows.Forms.Label labelCopyright;
         private System.Windows.Forms.Label labelCompanyName;
         private System.Windows.Forms.Button okButton;
-        private System.Windows.Forms.TextBox DescritpionBox;
+        private System.Windows.Forms.TextBox DescriptionBox;
     }
 }

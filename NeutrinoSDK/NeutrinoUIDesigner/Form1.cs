@@ -84,6 +84,7 @@ namespace NeutrinoUIDesigner
 
         private void newViewToolStripMenuItem_Click(object sender, EventArgs e)
         {
+            SaveFile = "";
             Items = new List<Item>() { new Item("<View>", "") };
             ReloadItems();
         }
@@ -236,7 +237,7 @@ namespace NeutrinoUIDesigner
             if (Path.GetExtension(file) == ".ns")
             {
                 string ser = "";
-                List<string> f = new List<string>(File.ReadAllLines(file));
+                List<string> f = new List<string>(File.ReadAllLines(file, Encoding.GetEncoding(1252)));
                 for (int i = 0; i < f.Count; i++)
                 {
                     if (f[i].StartsWith("spush"))
@@ -298,8 +299,8 @@ namespace NeutrinoUIDesigner
         private void Save()
         {
             string name = Path.GetFileNameWithoutExtension(SaveFile);
-            if (Path.GetExtension(SaveFile) == ".ns") File.WriteAllText(SaveFile, "; " + name + " View Layout\n\n:" + name + "_CreateView\nspush \"" + Items[0].Text.Replace("\"", "\\\"") + "\"\nextcall WMCreateWindow\npop __" + name + "_hwnd ; Do not modify the handle variable!\npush __" + name + "_hwnd\nextcall WMSetActiveWindow\nextcall WMUpdateView\nret\n\n:" + name + "_DestroyView\npush __" + name + "_hwnd\nextcall WMDestroyWindow\nret\n\n; Auto-generated with Neutrino UI Design Tool\n; #include " + name + ".ns\n");
-            else File.WriteAllText(SaveFile, Items[0].Text);
+            if (Path.GetExtension(SaveFile) == ".ns") File.WriteAllText(SaveFile, "; " + name + " View Layout\n\n:" + name + "_CreateView\nspush \"" + Items[0].Text.Replace("\"", "\\\"") + "\"\nextcall WMCreateWindow\npop __" + name + "_hwnd ; Do not modify the handle variable!\npush __" + name + "_hwnd\nextcall WMSetActiveWindow\nextcall WMUpdateView\nret\n\n:" + name + "_DestroyView\npush __" + name + "_hwnd\nextcall WMDestroyWindow\nret\n\n; Auto-generated with Neutrino UI Design Tool\n; #include " + name + ".ns\n", Encoding.GetEncoding(1252));
+            else File.WriteAllText(SaveFile, Items[0].Text, Encoding.GetEncoding(1252));
             UnsavedWork = false;
         }
         private bool ExitApp()

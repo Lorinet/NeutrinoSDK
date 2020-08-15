@@ -46,6 +46,9 @@
             this.label7 = new System.Windows.Forms.Label();
             this.WidthBox = new System.Windows.Forms.NumericUpDown();
             this.label8 = new System.Windows.Forms.Label();
+            this.BorderBox = new System.Windows.Forms.CheckBox();
+            this.itemsBox = new System.Windows.Forms.TextBox();
+            this.label9 = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.ElementIDBox)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.PosXBox)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.PosYBox)).BeginInit();
@@ -81,7 +84,7 @@
             this.label2.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.label2.Location = new System.Drawing.Point(44, 39);
             this.label2.Name = "label2";
-            this.label2.Size = new System.Drawing.Size(32, 15);
+            this.label2.Size = new System.Drawing.Size(31, 15);
             this.label2.TabIndex = 2;
             this.label2.Text = "Type";
             // 
@@ -93,11 +96,13 @@
             "Button",
             "CheckBox",
             "ToggleButton",
-            "TextField",
             "TextBox",
-            "ListBox",
-            "ComboBox",
-            "Image"});
+            "Image",
+            "TextBuffer",
+            "ListView",
+            "StickyDraw",
+            "WakeOnInteraction",
+            "WindowInfo"});
             this.TypeBox.Location = new System.Drawing.Point(82, 37);
             this.TypeBox.Name = "TypeBox";
             this.TypeBox.Size = new System.Drawing.Size(181, 21);
@@ -151,7 +156,7 @@
             // 
             this.label5.AutoSize = true;
             this.label5.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label5.Location = new System.Drawing.Point(48, 170);
+            this.label5.Location = new System.Drawing.Point(269, 9);
             this.label5.Name = "label5";
             this.label5.Size = new System.Drawing.Size(28, 15);
             this.label5.TabIndex = 8;
@@ -159,15 +164,15 @@
             // 
             // ElementTextBox
             // 
-            this.ElementTextBox.Location = new System.Drawing.Point(82, 168);
+            this.ElementTextBox.Location = new System.Drawing.Point(303, 7);
             this.ElementTextBox.Multiline = true;
             this.ElementTextBox.Name = "ElementTextBox";
-            this.ElementTextBox.Size = new System.Drawing.Size(181, 145);
+            this.ElementTextBox.Size = new System.Drawing.Size(181, 77);
             this.ElementTextBox.TabIndex = 9;
             // 
             // button1
             // 
-            this.button1.Location = new System.Drawing.Point(145, 359);
+            this.button1.Location = new System.Drawing.Point(367, 211);
             this.button1.Name = "button1";
             this.button1.Size = new System.Drawing.Size(118, 34);
             this.button1.TabIndex = 10;
@@ -177,7 +182,7 @@
             // 
             // button2
             // 
-            this.button2.Location = new System.Drawing.Point(15, 359);
+            this.button2.Location = new System.Drawing.Point(237, 211);
             this.button2.Name = "button2";
             this.button2.Size = new System.Drawing.Size(124, 34);
             this.button2.TabIndex = 11;
@@ -233,17 +238,16 @@
             "Segments 42 Numbers",
             "Open Iconic 48",
             "Open Iconic 64"});
-            this.FontBox.Location = new System.Drawing.Point(82, 319);
+            this.FontBox.Location = new System.Drawing.Point(82, 168);
             this.FontBox.Name = "FontBox";
             this.FontBox.Size = new System.Drawing.Size(181, 21);
             this.FontBox.TabIndex = 13;
-            this.FontBox.SelectedIndexChanged += new System.EventHandler(this.FontBox_SelectedIndexChanged);
             // 
             // label6
             // 
             this.label6.AutoSize = true;
             this.label6.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label6.Location = new System.Drawing.Point(44, 321);
+            this.label6.Location = new System.Drawing.Point(44, 170);
             this.label6.Name = "label6";
             this.label6.Size = new System.Drawing.Size(31, 15);
             this.label6.TabIndex = 12;
@@ -293,11 +297,42 @@
             this.label8.TabIndex = 14;
             this.label8.Text = "Width";
             // 
+            // BorderBox
+            // 
+            this.BorderBox.AutoSize = true;
+            this.BorderBox.Location = new System.Drawing.Point(19, 195);
+            this.BorderBox.Name = "BorderBox";
+            this.BorderBox.Size = new System.Drawing.Size(98, 17);
+            this.BorderBox.TabIndex = 19;
+            this.BorderBox.Text = "Element Border";
+            this.BorderBox.UseVisualStyleBackColor = true;
+            // 
+            // itemsBox
+            // 
+            this.itemsBox.Location = new System.Drawing.Point(303, 112);
+            this.itemsBox.Multiline = true;
+            this.itemsBox.Name = "itemsBox";
+            this.itemsBox.Size = new System.Drawing.Size(181, 77);
+            this.itemsBox.TabIndex = 21;
+            // 
+            // label9
+            // 
+            this.label9.AutoSize = true;
+            this.label9.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label9.Location = new System.Drawing.Point(269, 91);
+            this.label9.Name = "label9";
+            this.label9.Size = new System.Drawing.Size(109, 15);
+            this.label9.TabIndex = 20;
+            this.label9.Text = "Items (one per line)";
+            // 
             // AddElementDialogueBox
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(275, 403);
+            this.ClientSize = new System.Drawing.Size(497, 257);
+            this.Controls.Add(this.itemsBox);
+            this.Controls.Add(this.label9);
+            this.Controls.Add(this.BorderBox);
             this.Controls.Add(this.HeightBox);
             this.Controls.Add(this.label7);
             this.Controls.Add(this.WidthBox);
@@ -350,5 +385,8 @@
         private System.Windows.Forms.Label label7;
         private System.Windows.Forms.NumericUpDown WidthBox;
         private System.Windows.Forms.Label label8;
+        private System.Windows.Forms.CheckBox BorderBox;
+        private System.Windows.Forms.TextBox itemsBox;
+        private System.Windows.Forms.Label label9;
     }
 }

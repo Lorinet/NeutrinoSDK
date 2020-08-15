@@ -1,0 +1,6 @@
+C:\Users\Andrei\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\BytecodeAssembler\bin\Debug\ntrasm.exe.config
+C:\Users\Andrei\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\BytecodeAssembler\bin\Debug\ntrasm.exe
+C:\Users\Andrei\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\BytecodeAssembler\bin\Debug\ntrasm.pdb
+C:\Users\Andrei\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\BytecodeAssembler\obj\Debug\BytecodeAssembler.csprojAssemblyReference.cache
+C:\Users\Andrei\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\BytecodeAssembler\obj\Debug\ntrasm.exe
+C:\Users\Andrei\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\BytecodeAssembler\obj\Debug\ntrasm.pdb
