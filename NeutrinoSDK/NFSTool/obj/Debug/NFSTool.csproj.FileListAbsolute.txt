@@ -1,6 +1,16 @@
+<<<<<<< HEAD
 C:\Users\Andrei\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NFSTool\bin\Debug\nfsdimp.exe.config
 C:\Users\Andrei\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NFSTool\bin\Debug\nfsdimp.exe
 C:\Users\Andrei\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NFSTool\bin\Debug\nfsdimp.pdb
 C:\Users\Andrei\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NFSTool\obj\Debug\NFSTool.csprojAssemblyReference.cache
 C:\Users\Andrei\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NFSTool\obj\Debug\nfsdimp.exe
 C:\Users\Andrei\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NFSTool\obj\Debug\nfsdimp.pdb
+=======
+C:\Users\lorin\source\NeutrinoSDK\NeutrinoSDK\NFSTool\bin\Debug\nfsdimp.exe.config
+C:\Users\lorin\source\NeutrinoSDK\NeutrinoSDK\NFSTool\bin\Debug\nfsdimp.exe
+C:\Users\lorin\source\NeutrinoSDK\NeutrinoSDK\NFSTool\bin\Debug\nfsdimp.pdb
+C:\Users\lorin\source\NeutrinoSDK\NeutrinoSDK\NFSTool\obj\Debug\NFSTool.csprojAssemblyReference.cache
+C:\Users\lorin\source\NeutrinoSDK\NeutrinoSDK\NFSTool\obj\Debug\NFSTool.csproj.CoreCompileInputs.cache
+C:\Users\lorin\source\NeutrinoSDK\NeutrinoSDK\NFSTool\obj\Debug\nfsdimp.exe
+C:\Users\lorin\source\NeutrinoSDK\NeutrinoSDK\NFSTool\obj\Debug\nfsdimp.pdb
+>>>>>>> c5c12480ceec6bc3103371b22a630fedc47c5c0c
