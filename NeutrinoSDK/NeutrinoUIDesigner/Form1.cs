@@ -58,6 +58,12 @@ namespace NeutrinoUIDesigner
             foreach(Element el in els)
             {
                 Items.Add(new Item(el.GetProperty("Type") + " " + el.GetProperty("ID"), el.Serialize()));
+                if(el.GetProperty("Type") == "WindowInfo")
+                {
+                    toolStripTextBox1.Text = el.GetProperty("Width");
+                    toolStripTextBox2.Text = el.GetProperty("Height");
+                    SetWindowSize(el.GetPropertyInt("Width"), el.GetPropertyInt("Height"));
+                }
             }
             ReloadItems();
             //ShowSerializedView();
@@ -399,8 +405,13 @@ namespace NeutrinoUIDesigner
 
         private void applyToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            ScreenWidth = int.Parse(toolStripTextBox1.Text);
-            ScreenHeight = int.Parse(toolStripTextBox2.Text);
+            SetWindowSize(int.Parse(toolStripTextBox1.Text), int.Parse(toolStripTextBox2.Text));
+        }
+
+        private void SetWindowSize(int w, int h)
+        {
+            ScreenWidth = w;
+            ScreenHeight = h;
             panel3.Width = ScreenWidth * 2;
             panel3.Height = ScreenHeight * 2;
             label1.Location = new Point(10 + ScreenWidth * 2, 10);
