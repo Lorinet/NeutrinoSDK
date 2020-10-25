@@ -4,3 +4,10 @@ C:\Users\Andrei\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\BytecodeAssembler\bin\R
 C:\Users\Andrei\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\BytecodeAssembler\obj\Release\BytecodeAssembler.csprojAssemblyReference.cache
 C:\Users\Andrei\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\BytecodeAssembler\obj\Release\ntrasm.exe
 C:\Users\Andrei\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\BytecodeAssembler\obj\Release\ntrasm.pdb
+C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\BytecodeAssembler\bin\Release\ntrasm.exe.config
+C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\BytecodeAssembler\bin\Release\ntrasm.exe
+C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\BytecodeAssembler\bin\Release\ntrasm.pdb
+C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\BytecodeAssembler\obj\Release\BytecodeAssembler.csprojAssemblyReference.cache
+C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\BytecodeAssembler\obj\Release\BytecodeAssembler.csproj.CoreCompileInputs.cache
+C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\BytecodeAssembler\obj\Release\ntrasm.exe
+C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\BytecodeAssembler\obj\Release\ntrasm.pdb

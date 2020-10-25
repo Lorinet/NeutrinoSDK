@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Whiplash": {
+      "commandName": "Project",
+      "commandLineArgs": "file.py out.ns"
+    }
+  }
+}
