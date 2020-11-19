@@ -11,4 +11,4 @@ Manipulates NFS deployment images. For now, Neutrino OS has limited support for 
 ### ntrdisasm
 Disassembles Neutrino bytecode contained in NEX executables/libraries into valid Neutrino IL code. This tool is unstable as of now.
 ### whiplash
-Compiler for writing Neutrino apps in Python instead of NIL.
+Compiler for writing Neutrino apps in Python.
