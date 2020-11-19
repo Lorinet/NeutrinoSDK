@@ -3,7 +3,7 @@ Neutrino OS Software Development Kit
 
 ## Tools included
 ### ntrasm
-Compiles Neutrino IL into NEX executables or libraries.
+Assembles Neutrino IL into NEX executables or libraries.
 ### uieditor
 View layout design tool for Neutrino graphical apps.
 ### nfstool
