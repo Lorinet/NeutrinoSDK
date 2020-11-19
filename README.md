@@ -1,5 +1,5 @@
 # NeutrinoSDK
-Official Neutrino OS Software Development Kit
+Neutrino OS Software Development Kit
 
 ## Tools included
 ### ntrasm
