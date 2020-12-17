@@ -25,7 +25,7 @@ namespace Whiplash
         public void Start(string[] args)
         {
             Console.WriteLine("Neutrino Python Compiler");
-            if(args.Length != 2)
+            if (args.Length != 2)
             {
                 Console.WriteLine("Usage: whiplash <file.py> <out.ns>");
                 Environment.Exit(-1);
@@ -39,6 +39,7 @@ namespace Whiplash
             reg.Add("return", new Regex("^\\s*return\\s*$"));
             reg.Add("return_val", new Regex("^\\s*return\\s+(.+)$"));
             reg.Add("assign_var_var", new Regex("^\\s*(\\w+)\\s*=\\s*(\\w+)$"));
+            reg.Add("assign_var_call", new Regex("^\\s*(\\w+)\\s*=\\s*([\\s\\w(),=]+[(]+[\\s\\w(),]+)$"));
             reg.Add("method_call", new Regex("^\\s*(\\w+)\\s*[(](((\\s*\\w+\\s*[,]{0,1}\\s*){0,1}[,]{0,1}(\"(\\s*[\\w\\\\]*\\s*)*\"){0,1}[,]{0,1}\\s*)*)[)]$"));
             reg.Add("while", new Regex("^\\s*while\\s*([\\w\\s=!<>()]+)\\s*:\\s*$"));
             reg.Add("if", new Regex("^\\s*if\\s*([\\w\\s=!<>()]+)\\s*:\\s*$"));
@@ -55,7 +56,7 @@ namespace Whiplash
                 else
                 {
                     string ind = "";
-                    for(int id = 0; id < ln.Length; id++)
+                    for (int id = 0; id < ln.Length; id++)
                     {
                         if (ln[id] != ' ') break;
                         ind += " ";
@@ -116,14 +117,14 @@ namespace Whiplash
                             nm = "_while_" + meth.Peek().Name + "@" + meth.Peek().WhileCount.ToString();
                             methcode[meth.Peek().Name].Add("goto " + nm);
                             meth.Peek().WhileCount += 1;
-                            meth.Push(new Block(nm, BlockType.While, new Expression(m.Groups[1].ToString())));
+                            meth.Push(new Block(nm, BlockType.While, new Token(m.Groups[1].ToString())));
                             methcode.Add(nm, new List<string>());
                             break;
                         case "if":
                             nm = "_if_" + meth.Peek().Name + "@" + meth.Peek().IfCount.ToString();
                             methcode[meth.Peek().Name].Add("goto " + nm);
                             meth.Peek().IfCount += 1;
-                            meth.Push(new Block(nm, BlockType.If, new Expression(m.Groups[1].ToString())));
+                            meth.Push(new Block(nm, BlockType.If, new Token(m.Groups[1].ToString())));
                             methcode.Add(nm, new List<string>());
                             break;
                         case "return":
@@ -159,6 +160,48 @@ namespace Whiplash
                         case "assign_var_var":
                             methcode[meth.Peek().Name].Add("mov " + GetVarName(m.Groups[1].ToString()) + " " + GetVarName(m.Groups[2].ToString()));
                             break;
+                        case "assign_var_call":
+                            for (int j = 0; j < lin.Length; j++)
+                            {
+                                if (lin[0] != ' ') break;
+                                lin = lin.Remove(0, 1);
+                            }
+                            if (!lin.StartsWith("def"))
+                            {
+                                tk = new Token(lin);
+                                Stack<string> left = new Stack<string>();
+                                left.Push(tk[0].Name);
+                                List<Token> tkns = new List<Token>();
+                                for (int i = 1; i < tk.Tokens.Count; i++) tkns.Add(tk[i]);
+                                tkr = new Token();
+                                tkr.Add(tkns.ToArray());
+                                tkr.Name = tk.Name;
+                                tk = tkr;
+                                int lev = 0;
+                                while (true)
+                                {
+                                    if (tkr.ChildIndex < tkr.Tokens.Count)
+                                    {
+                                        lev++;
+                                        tkr = tkr.Tokens[tkr.ChildIndex];
+                                    }
+                                    else
+                                    {
+                                        if (lev == 0) break;
+                                        if (tkr.IsAssignment) left.Push(GetVarName(tkr.Name));
+                                        if (tkr.Tokens.Count == 0) methcode[meth.Peek().Name].Add("push " + GetVarName(tkr.Name));
+                                        lev--;
+                                        tkr = Token.Node(ref tk, lev);
+                                        tkr.ChildIndex++;
+                                        if (tkr.ChildIndex == tkr.Tokens.Count && tkr.Tokens.Count > 0)
+                                        {
+                                            methcode[meth.Peek().Name].Add("call " + tkr.Name);
+                                            methcode[meth.Peek().Name].Add("pop " + left.Pop());
+                                        }
+                                    }
+                                }
+                            }
+                            break;
                         case "method_call":
                             for (int j = 0; j < lin.Length; j++)
                             {
@@ -167,7 +210,7 @@ namespace Whiplash
                             }
                             if (!lin.StartsWith("def"))
                             {
-                                tk = new MethodCallToken(lin);
+                                tk = new Token(lin);
                                 tkr = tk;
                                 int lev = 0;
                                 while (true)
@@ -193,16 +236,16 @@ namespace Whiplash
                             }
                             break;
                         case "name":
-                            tk = new NameToken(m.Groups[0].ToString());
+                            tk = new Token(m.Groups[0].ToString());
                             break;
                         case "str_lit":
-                            tk = new LiteralToken(m.Groups[1].ToString());
+                            tk = new Token(m.Groups[1].ToString());
                             break;
                         case "hex_lit":
-                            tk = new LiteralToken(m.Groups[0].ToString());
+                            tk = new Token(m.Groups[0].ToString());
                             break;
                         case "dec_lit":
-                            tk = new LiteralToken(m.Groups[0].ToString());
+                            tk = new Token(m.Groups[0].ToString());
                             break;
                     }
                 }
@@ -212,13 +255,13 @@ namespace Whiplash
         string GetVarName(string var)
         {
             string nm = "";
-            for(int i = 0; i < meth.Count; i++)
+            for (int i = 0; i < meth.Count; i++)
             {
                 nm = meth.ToArray()[i] + "!" + var;
                 if (vars.Contains(nm)) break;
                 else nm = "";
             }
-            if(nm == "")
+            if (nm == "")
             {
                 nm = meth.Peek() + "!" + var;
             }
@@ -237,7 +280,7 @@ namespace Whiplash
     {
         public string Name { get; set; }
         public BlockType Type { get; set; }
-        public Expression Condition { get; set; }
+        public Token Condition { get; set; }
         public int IfCount { get; set; }
         public int WhileCount { get; set; }
         public Block(string name, BlockType type)
@@ -247,7 +290,7 @@ namespace Whiplash
             IfCount = 0;
             WhileCount = 0;
         }
-        public Block(string name, BlockType type, Expression cond)
+        public Block(string name, BlockType type, Token cond)
         {
             Name = name;
             Type = type;
@@ -271,23 +314,8 @@ namespace Whiplash
     {
         MethodCall,
         Literal,
-        Name
-    }
-    class Expression
-    {
-        public Token Left { get; set; }
-        public Token Right { get; set; }
-        public string Operator { get; set; }
-        public Expression(Token left, Token right, string oper)
-        {
-            Left = left;
-            Right = right;
-            Operator = oper;
-        }
-        public Expression(string code)
-        {
-
-        }
+        Name,
+        Operator
     }
     class Token
     {
@@ -295,36 +323,31 @@ namespace Whiplash
         public string Name { get; set; }
         public string Text { get; set; }
         public int ChildIndex { get; set; }
+        public bool IsAssignment { get; set; }
         public TokenType Type { get; set; }
-        public Token(TokenType type)
+        public Token()
         {
             Tokens = new List<Token>();
             Text = "";
             Name = "";
             ChildIndex = 0;
-            Type = type;
+            IsAssignment = false;
         }
-        public static Token Node(ref Token tree, int lev)
+        public Token(string t)
         {
-            Token tkr = tree;
-            for (int l = 0; l < lev; l++)
-            {
-                tkr = tkr.Tokens[tkr.ChildIndex];
-            }
-            return tkr;
-        }
-    }
-    class MethodCallToken : Token
-    {
-        public MethodCallToken(string t) : base(TokenType.MethodCall)
-        {
+            Tokens = new List<Token>();
+            Text = "";
+            Name = "";
+            ChildIndex = 0;
+            IsAssignment = false;
             Text = t;
             string ct = "";
             string bound = "";
             string name = "";
             bool pastName = false;
             bool cp = false;
-            for(int i = 0; i < t.Length; i++)
+            bool relate = false;
+            for (int i = 0; i < t.Length; i++)
             {
                 if (pastName)
                 {
@@ -345,54 +368,86 @@ namespace Whiplash
                         bound = bound.Remove(bound.Length - 1);
                     }
                     else if (bound.Length == 0) cp = false;
-                    if (bound.Length == 0 && (t[i] == ',' || (!cp && t[i] == ')')))
+                    if (bound.Length == 0 && (t[i] == ',' || t[i] == '=' || (!cp && t[i] == ')')))
                     {
-                        if(ct[ct.Length - 1] == ',' || (!cp && ct[ct.Length - 1] == ')')) ct = ct.Remove(ct.Length - 1);
+                        if (ct[ct.Length - 1] == ',' || ct[ct.Length - 1] == '=' || (!cp && ct[ct.Length - 1] == ')')) ct = ct.Remove(ct.Length - 1);
                         for (int j = 0; j < ct.Length; j++)
                         {
                             if (ct[0] != ' ') break;
                             ct = ct.Remove(0, 1);
                         }
                         if (ct == Text) return;
-                        Tokens.Add(new MethodCallToken(ct));
+                        Tokens.Add(new Token(ct));
                         ct = "";
                         cp = false;
                     }
                 }
                 else
                 {
-                    if(t[i] == '(')
+                    if (t[i] == '(')
                     {
                         pastName = true;
                     }
+                    else if (t[i] == '=')
+                    {
+                        relate = true;
+                    }
                     else name += t[i];
+                }
+                if (relate)
+                {
+                    for (int j = 0; j < name.Length; j++)
+                    {
+                        if (name[0] != ' ') break;
+                        name = name.Remove(0, 1);
+                    }
+                    for (int j = name.Length - 1; j >= 0; j--)
+                    {
+                        if (name[0] != ' ') break;
+                        name = name.Remove(0, 1);
+                    }
+                    Tokens.Add(new Token(name));
+                    Tokens[Tokens.Count - 1].IsAssignment = true;
+                    name = "";
+                    for (int j = 0; j <= i; j++)
+                    {
+                        Text = Text.Remove(0, 1);
+                    }
+                    for (int j = 0; j < Text.Length; j++)
+                    {
+                        if (Text[0] != ' ') break;
+                        Text = Text.Remove(0, 1);
+                    }
+                    relate = false;
                 }
             }
             Name = name.Trim();
+            int n;
+            if (Tokens.Count > 0) Type = TokenType.MethodCall;
+            else if (Text.StartsWith("\"") || Text.StartsWith("0x") || int.TryParse(Text, out n)) Type = TokenType.Literal;
+            else if (Text == "==" || Text == "=") Type = TokenType.Operator;
+            else Type = TokenType.Name;
         }
-    }
-    class LiteralToken : Token
-    {
-        public LiteralToken(string t) : base(TokenType.Literal)
+        public Token this[int index]
         {
-            Text = t;
+            get => Tokens[index];
+            set => Tokens[index] = value;
         }
-    }
-    class NameToken : Token
-    {
-        public NameToken(string t) : base(TokenType.Name)
+        public static Token Node(ref Token tree, int lev)
         {
-            Name = t;
+            Token tkr = tree;
+            for (int l = 0; l < lev; l++)
+            {
+                tkr = tkr.Tokens[tkr.ChildIndex];
+            }
+            return tkr;
         }
-    }
-    class MethodCall
-    {
-        public string Method { get; set; }
-        public List<string> Args { get; set; }
-        public MethodCall(string method)
+        public void Add(params Token[] t)
         {
-            Method = method;
-            Args = new List<string>();
+            for (int i = 0; i < t.Length; i++)
+            {
+                Tokens.Add(t[i]);
+            }
         }
     }
 }
