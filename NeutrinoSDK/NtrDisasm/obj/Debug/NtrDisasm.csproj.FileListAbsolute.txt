@@ -1,16 +1,7 @@
-<<<<<<< HEAD
-C:\Users\Andrei\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NtrDisasm\bin\Debug\NtrDisasm.exe.config
-C:\Users\Andrei\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NtrDisasm\bin\Debug\NtrDisasm.exe
-C:\Users\Andrei\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NtrDisasm\bin\Debug\NtrDisasm.pdb
-C:\Users\Andrei\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NtrDisasm\obj\Debug\NtrDisasm.csprojAssemblyReference.cache
-C:\Users\Andrei\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NtrDisasm\obj\Debug\NtrDisasm.exe
-C:\Users\Andrei\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NtrDisasm\obj\Debug\NtrDisasm.pdb
-=======
-C:\Users\lorin\source\NeutrinoSDK\NeutrinoSDK\NtrDisasm\bin\Debug\NtrDisasm.exe.config
-C:\Users\lorin\source\NeutrinoSDK\NeutrinoSDK\NtrDisasm\bin\Debug\NtrDisasm.exe
-C:\Users\lorin\source\NeutrinoSDK\NeutrinoSDK\NtrDisasm\bin\Debug\NtrDisasm.pdb
-C:\Users\lorin\source\NeutrinoSDK\NeutrinoSDK\NtrDisasm\obj\Debug\NtrDisasm.csprojAssemblyReference.cache
-C:\Users\lorin\source\NeutrinoSDK\NeutrinoSDK\NtrDisasm\obj\Debug\NtrDisasm.csproj.CoreCompileInputs.cache
-C:\Users\lorin\source\NeutrinoSDK\NeutrinoSDK\NtrDisasm\obj\Debug\NtrDisasm.exe
-C:\Users\lorin\source\NeutrinoSDK\NeutrinoSDK\NtrDisasm\obj\Debug\NtrDisasm.pdb
->>>>>>> c5c12480ceec6bc3103371b22a630fedc47c5c0c
+C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NtrDisasm\bin\Debug\NtrDisasm.exe.config
+C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NtrDisasm\bin\Debug\NtrDisasm.exe
+C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NtrDisasm\bin\Debug\NtrDisasm.pdb
+C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NtrDisasm\obj\Debug\NtrDisasm.csprojAssemblyReference.cache
+C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NtrDisasm\obj\Debug\NtrDisasm.csproj.CoreCompileInputs.cache
+C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NtrDisasm\obj\Debug\NtrDisasm.exe
+C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NtrDisasm\obj\Debug\NtrDisasm.pdb
