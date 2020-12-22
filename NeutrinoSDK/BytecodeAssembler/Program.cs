@@ -211,9 +211,10 @@ namespace BytecodeAssembler
                         }
                         if (!found)
                         {
-                            RageQuit(NError.SymbolMissing, "Symbol not found: " + sym);
+                            //RageQuit(NError.SymbolMissing, "Symbol not found: " + sym);
+                            code[i] = code[i].Remove(0, 3);
                         }
-                        code[i] = "extcall " + oi + " " + si;
+                        else code[i] = "extcall " + oi + " " + si;
                     }
                     else if(code[i].StartsWith("extmovl"))
                     {
@@ -1029,7 +1030,7 @@ namespace BytecodeAssembler
                         int value = 0;
                         if (!int.TryParse(s.Remove(0, 5 + arg[1].Length), out value))
                         {
-                            value = int.Parse(s.Remove(0, 6 + arg[1].Length), System.Globalization.NumberStyles.HexNumber);
+                            value = int.Parse(s.Remove(0, 7 + arg[1].Length), System.Globalization.NumberStyles.HexNumber);
                         }
                         if (!vars.ContainsKey(arg[1]))
                         {
@@ -1043,9 +1044,9 @@ namespace BytecodeAssembler
                     {
                         pcode.Add((byte)OpCode.DEC);
                         int value = 0;
-                        if (!int.TryParse(s.Remove(0, 6 + arg[1].Length), out value))
+                        if (!int.TryParse(s.Remove(0, 5 + arg[1].Length), out value))
                         {
-                            value = int.Parse(s.Remove(0, 5 + arg[1].Length), System.Globalization.NumberStyles.HexNumber);
+                            value = int.Parse(s.Remove(0, 7 + arg[1].Length), System.Globalization.NumberStyles.HexNumber);
                         }
                         if (!vars.ContainsKey(arg[1]))
                         {

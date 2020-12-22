@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Dynamic;
 using System.IO;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace Whiplash
@@ -23,6 +24,7 @@ namespace Whiplash
         Stack<Block> meth = new Stack<Block>();
         List<string> vars = new List<string>();
         Dictionary<string, List<string>> methcode = new Dictionary<string, List<string>>();
+        string importDirectories = Path.Combine(Path.GetPathRoot(Environment.SystemDirectory), "Neutrino\\ndk\\whiplash");
         public void Start(string[] args)
         {
             Console.WriteLine("Neutrino Python Compiler");
@@ -34,28 +36,36 @@ namespace Whiplash
             string infile = args[0];
             string outfile = args[1];
             il.Add("; Compiled with Whiplash Python Compiler version " + version);
+            il.Add("; File: " + infile);
             il.Add(":&__ret_func");
             il.Add("ret");
             List<string> lines = new List<string>(File.ReadAllLines(infile));
             lines.Add("");
+            reg.Add("include", new Regex("^\\s*include\\s+(\\w+)\\s*$"));
             reg.Add("import", new Regex("^\\s*import\\s+(\\w+)\\s*$"));
-            reg.Add("inline_il", new Regex("^\\s*!\\s*[(][']([\\w\\s\\(\\)\",=<>!.]*)['][)]\\s*"));
+            reg.Add("inline_il", new Regex("^\\s*!\\s*[(][']([#\\w\\s\\(\\)\",=<>!.]*)['][)]\\s*"));
             reg.Add("def", new Regex("^\\s*def\\s+(\\w+)\\s*[(]((\\s*\\w+\\s*[,]{0,1}\\s*)*)[)]:$"));
             reg.Add("return", new Regex("^\\s*return\\s*$"));
             reg.Add("return_val", new Regex("^\\s*return\\s+(.+)$"));
-            reg.Add("method_call", new Regex("^\\s*([@\\w]+)\\s*[(]([\\w\\s\\(\\),=<>!.\"']*)[)]"));
+            reg.Add("method_call", new Regex("^\\s*([@\\w]+)\\s*[(]([\\w\\s\\(\\),=<>!.\"'\\\\]*)[)]"));
             reg.Add("assign_var_var", new Regex("^\\s*(\\w+)\\s*=\\s*(\\w+)$"));
-            reg.Add("assign_var_call", new Regex("^\\s*(\\w+)\\s*=\\s*([@\\w\\s\\(\\),=<>!.\"']+)$"));
+            reg.Add("assign_var_call", new Regex("^\\s*(\\w+)\\s*=\\s*([@\\w\\s\\(\\),=<>!.\"'\\\\]+)$"));
             reg.Add("while", new Regex("^\\s*while\\s*([\\w\\s=!<>()]+)\\s*:\\s*$"));
-            reg.Add("if", new Regex("^\\s*if\\s*([\\w\\s=!<>()]+)\\s*:\\s*$"));
+            reg.Add("if", new Regex("^\\s*if\\s*([\\w\\s=!<>,()\"'\\\\@]+)\\s*:\\s*$"));
+            reg.Add("elif", new Regex("^\\s*elif\\s*([\\w\\s=!<>,()\"'\\\\@]+)\\s*:\\s*$"));
+            reg.Add("else", new Regex("^\\s*else\\s*:\\s*$"));
             textreg.Add("str_lit", new Regex("^\\s*(\"{1}([\\w\\s]*(\\\\|[\\w\\s\",?!])*)*((?!\\\\)\"){1})\\s*$"));
             textreg.Add("hex_lit", new Regex("^\\s*?(0x[\\dABCDEF]+)\\s*$"));
             textreg.Add("dec_lit", new Regex("^\\s*?(\\d)+\\s*$"));
             textreg.Add("name", new Regex("^\\s*(?!\\d)(\\w+)\\s*$"));
             textreg.Add("compare_equality", new Regex("\\s * (\\w +)\\s *==\\s * ([\\s\\w(),=] +)$"));
+            methcode.Add("main", new List<string>());
+            meth.Push(new Block("main", BlockType.Method));
+            methcode["main"].Add("link whiprt.lnx");
             for (int i = 0; i < lines.Count; i++)
             {
                 string ln = lines[i];
+                if (ln.Trim() == "" || ln.Trim()[0] == '#') continue;
                 prevTab = tab;
                 if (ln.StartsWith("\t"))
                     tab = ln.Split('\t').Length - 1;
@@ -78,16 +88,17 @@ namespace Whiplash
                     }
                 }
                 else if (retp) retp = false;
-                ParseLine(lines[i]);
+                ParseLine(lines[i], i, infile);
             }
             foreach (string k in methcode.Keys)
             {
                 il.Add(":" + k);
+                if (methcode[k].Count > 0 && !methcode[k][methcode[k].Count - 1].Trim().StartsWith("ret")) methcode[k].Add("ret");
                 il.AddRange(methcode[k]);
             }
             File.WriteAllLines(outfile, il.ToArray());
         }
-        Token ParseLine(string s)
+        Token ParseLine(string s, int lnu, string fil)
         {
             Match m;
             string nm = "";
@@ -99,9 +110,22 @@ namespace Whiplash
                 m = reg[g].Match(lin);
                 if (m.Success)
                 {
-                    if (g == "import") il.Add("#include " + m.Groups[1] + ".ns");
+                    if (g == "import")
+                    {
+                        string ipa = "..\\" + m.Groups[1] + ".py";
+                        if (!File.Exists(ipa))
+                        {
+                            ipa = Path.Combine(importDirectories, m.Groups[1] + ".py");
+                        }
+                        if (!File.Exists(ipa))
+                        {
+                            Error("Cannot find file: " + m.Groups[1], lnu, fil);
+                        }
+                    }
+                    else if (g == "include") il.Add("#include " + m.Groups[1] + ".ns");
                     else if (g == "def")
                     {
+                        if (methcode.ContainsKey(m.Groups[1].ToString())) Error("Redefinition of " + m.Groups[1].ToString(), lnu, fil);
                         meth.Push(new Block(m.Groups[1].ToString(), BlockType.Method));
                         methcode.Add(m.Groups[1].ToString(), new List<string>());
                         if (m.Groups[1].ToString() == "main") methcode[m.Groups[1].ToString()].Add("link whiprt.lnx");
@@ -115,7 +139,7 @@ namespace Whiplash
                             }
                         }
                     }
-                    else if (g == "inline_il") 
+                    else if (g == "inline_il")
                         methcode[meth.Peek().Name].Add(m.Groups[1].ToString());
                     else if (g == "while")
                     {
@@ -127,8 +151,35 @@ namespace Whiplash
                     }
                     else if (g == "if")
                     {
+                        nm = meth.Peek().Name + "!&!cond";
+                        if (!vars.Contains(nm)) vars.Add(nm);
                         nm = "_if_" + meth.Peek().Name + "@" + meth.Peek().IfCount.ToString();
-                        methcode[meth.Peek().Name].Add("goto " + nm);
+                        ParseStatement("&!cond = " + m.Groups[1].ToString());
+                        ParseStatement("&!orig_cond = &!cond");
+                        methcode[meth.Peek().Name].Add("cmpi " + GetVarName("&!cond") + " 1");
+                        methcode[meth.Peek().Name].Add("jeq " + nm);
+                        meth.Peek().IfCount += 1;
+                        meth.Push(new Block(nm, BlockType.If, new Token(m.Groups[1].ToString())));
+                        methcode.Add(nm, new List<string>());
+                    }
+                    else if (g == "elif")
+                    {
+                        nm = meth.Peek().Name + "!&!cond";
+                        if (!vars.Contains(nm)) vars.Add(nm);
+                        nm = "_elif_" + meth.Peek().Name + "@" + meth.Peek().IfCount.ToString();
+                        ParseStatement("&!cond = !&!orig_cond && " + m.Groups[1].ToString());
+                        methcode[meth.Peek().Name].Add("cmpi " + GetVarName("&!cond") + " 1");
+                        methcode[meth.Peek().Name].Add("jeq " + nm);
+                        meth.Peek().IfCount += 1;
+                        meth.Push(new Block(nm, BlockType.If, new Token(m.Groups[1].ToString())));
+                        methcode.Add(nm, new List<string>());
+                        methcode[nm].Add("str " + meth.ToArray()[1].Name + "!&!orig_cond 1");
+                    }
+                    else if (g == "else")
+                    {
+                        nm = "_else_" + meth.Peek().Name + "@" + meth.Peek().IfCount.ToString();
+                        methcode[meth.Peek().Name].Add("cmpi " + meth.Peek().Name + "!&!orig_cond 1");
+                        methcode[meth.Peek().Name].Add("jne " + nm);
                         meth.Peek().IfCount += 1;
                         meth.Push(new Block(nm, BlockType.If, new Token(m.Groups[1].ToString())));
                         methcode.Add(nm, new List<string>());
@@ -145,14 +196,14 @@ namespace Whiplash
                     }
                     else if (g == "return_val")
                     {
-                        tkr = ParseLine(m.Groups[1].ToString());
+                        tkr = ParseLine(m.Groups[1].ToString(), lnu, fil);
                         if (tkr != null)
                         {
-                            if (tkr.Type == TokenType.Literal)
+                            if (tkr.ValType == ValueType.Literal)
                             {
                                 methcode[meth.Peek().Name].Add("spush " + tkr.Text);
                             }
-                            else if (tkr.Type == TokenType.Name)
+                            else if (tkr.ValType == ValueType.Name)
                             {
                                 methcode[meth.Peek().Name].Add("push " + GetVarName(tkr.Name));
                             }
@@ -168,90 +219,65 @@ namespace Whiplash
                     else if (g == "assign_var_var") methcode[meth.Peek().Name].Add("mov " + GetVarName(m.Groups[1].ToString()) + " " + GetVarName(m.Groups[2].ToString()));
                     else if (g == "assign_var_call" || g == "method_call")
                     {
-                        for (int j = 0; j < lin.Length; j++)
-                        {
-                            if (lin[0] != ' ') break;
-                            lin = lin.Remove(0, 1);
-                        }
-                        if (!lin.StartsWith("def"))
-                        {
-                            tk = new Token(lin);
-                            tkr = tk;
-                            int lev = 0;
-                            while (true)
-                            {
-                                if (tkr.ChildIndex < tkr.Tokens.Count)
-                                {
-                                    lev++;
-                                    tkr = tkr.Tokens[tkr.ChildIndex];
-                                }
-                                else
-                                {
-                                    if (lev == 0) break;
-                                    lev--;
-                                    if (tkr.Tokens.Count == 0)
-                                    {
-                                        if (tkr.Type == TokenType.Name) methcode[meth.Peek().Name].Add("push " + GetVarName(tkr.Name));
-                                        else if (tkr.Type == TokenType.Literal) methcode[meth.Peek().Name].Add("spush " + tkr.Text);
-                                    }
-                                    tkr = Token.Node(ref tk, lev);
-                                    tkr.ChildIndex++;
-                                    if (tkr.ChildIndex == tkr.Tokens.Count && tkr.Tokens.Count > 0)
-                                    {
-                                        if (tkr.Type == TokenType.MethodCall)
-                                        {
-                                            if (tkr.Name[0] == '@') methcode[meth.Peek().Name].Add("extcall " + tkr.Name.Remove(0, 1));
-                                            else methcode[meth.Peek().Name].Add("call " + tkr.Name);
-                                        }
-                                        else if (tkr.Type == TokenType.ComparisonEqual)
-                                        {
-                                            methcode[meth.Peek().Name].Add("push " + GetVarName(tkr.Name));
-                                            methcode[meth.Peek().Name].Add("extcall &__compare_eqf_func");
-                                        }
-                                        else if (tkr.Type == TokenType.ComparisonNotEqual)
-                                        {
-                                            methcode[meth.Peek().Name].Add("push " + GetVarName(tkr.Name));
-                                            methcode[meth.Peek().Name].Add("extcall &__compare_nef_func");
-                                        }
-                                        else if (tkr.Type == TokenType.ComparisonLess)
-                                        {
-                                            methcode[meth.Peek().Name].Add("push " + GetVarName(tkr.Name));
-                                            methcode[meth.Peek().Name].Add("extcall &__compare_lf_func");
-                                        }
-                                        else if (tkr.Type == TokenType.ComparisonGreater)
-                                        {
-                                            methcode[meth.Peek().Name].Add("push " + GetVarName(tkr.Name));
-                                            methcode[meth.Peek().Name].Add("extcall &__compare_gf_func");
-                                        }
-
-                                        else if (tkr.Type == TokenType.ComparisonLessEqual)
-                                        {
-                                            methcode[meth.Peek().Name].Add("push " + GetVarName(tkr.Name));
-                                            methcode[meth.Peek().Name].Add("extcall &__compare_lef_func");
-                                        }
-
-                                        else if (tkr.Type == TokenType.ComparisonGreaterEqual)
-                                        {
-                                            methcode[meth.Peek().Name].Add("push " + GetVarName(tkr.Name));
-                                            methcode[meth.Peek().Name].Add("extcall &__compare_gef_func");
-                                        }
-                                        else if (tkr.Type == TokenType.Assignment)
-                                        {
-                                            methcode[meth.Peek().Name].Add("pop " + GetVarName(tkr.Name));
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        ParseStatement(lin);
                     }
                 }
             }
             return tk;
         }
+        void ParseStatement(string stmt)
+        {
+            for (int j = 0; j < stmt.Length; j++)
+            {
+                if (stmt[0] != ' ') break;
+                stmt = stmt.Remove(0, 1);
+            }
+            if (!stmt.StartsWith("def"))
+            {
+                Token tk = new Token(stmt);
+                Token tkr = tk;
+                int lev = 0;
+                while (true)
+                {
+                    if (tkr.ChildIndex < tkr.Tokens.Count)
+                    {
+                        lev++;
+                        tkr = tkr.Tokens[tkr.ChildIndex];
+                    }
+                    else
+                    {
+                        if (lev == 0) break;
+                        lev--;
+                        if (tkr.Tokens.Count == 0)
+                        {
+                            if (tkr.ValType == ValueType.Name) methcode[meth.Peek().Name].Add("push " + GetVarName(tkr.Name));
+                            else if (tkr.ValType == ValueType.Literal) methcode[meth.Peek().Name].Add("spush " + tkr.Text);
+                            if (tkr.Negate) methcode[meth.Peek().Name].Add("extcall &__not_func");
+                        }
+                        tkr = Token.Node(ref tk, lev);
+                        tkr.ChildIndex++;
+                        if (tkr.ChildIndex == tkr.Tokens.Count && tkr.Tokens.Count > 0)
+                        {
+                            if (tkr.Type == TokenType.MethodCall)
+                            {
+                                if (tkr.Name[0] == '@') methcode[meth.Peek().Name].Add("extcall " + tkr.Name.Remove(0, 1));
+                                else methcode[meth.Peek().Name].Add("extcall " + tkr.Name);
+                                if (tkr.Negate) methcode[meth.Peek().Name].Add("extcall &__not_func");
+                            }
+                            else if (tkr.Type == TokenType.Assignment)
+                            {
+                                if (tkr.Negate) methcode[meth.Peek().Name].Add("extcall &__not_func");
+                                methcode[meth.Peek().Name].Add("pop " + GetVarName(tkr.Name));
+                            }
+                        }
+                    }
+                }
+            }
+        }
         string GetVarName(string var)
         {
             string nm = "";
-            for (int i = 0; i < meth.Count; i++)
+            for (int i = 0; i < meth.Count - 1; i++)
             {
                 nm = meth.ToArray()[i] + "!" + var;
                 if (vars.Contains(nm)) break;
@@ -260,14 +286,15 @@ namespace Whiplash
             if (nm == "")
             {
                 nm = meth.Peek() + "!" + var;
+                vars.Add(nm);
             }
             return nm;
         }
-        void Error(string err, string ln)
+        void Error(string err, int ln, string fil)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("Syntax error: " + err);
-            Console.WriteLine("At: " + ln);
+            Console.WriteLine("Error: " + err);
+            Console.WriteLine("At line " + ln + " of file " + fil);
             Console.ResetColor();
             Environment.Exit(-1);
         }
@@ -308,28 +335,18 @@ namespace Whiplash
     }
     enum TokenType
     {
+        Generic,
         MethodCall,
+        Assignment,
+        Increment,
+        Decrement
+    }
+    enum ValueType
+    {
         Literal,
         Name,
         Void,
-        Assignment,
-        ComparisonLess,
-        ComparisonLessEqual,
-        ComparisonGreater,
-        ComparisonGreaterEqual,
-        ComparisonEqual,
-        ComparisonNotEqual,
-        Plus,
-        Minus,
-        Multiply,
-        Divide,
-        Or,
-        And,
-        Not,
-        AndAnd,
-        OrOr,
-        LeftShift,
-        RightShift
+        MethodCall
     }
     class Token
     {
@@ -337,14 +354,17 @@ namespace Whiplash
         public string Name { get; set; }
         public string Text { get; set; }
         public int ChildIndex { get; set; }
+        public bool Negate { get; set; }
         public TokenType Type { get; set; }
+        public ValueType ValType { get; set; }
         public Token()
         {
             Tokens = new List<Token>();
             Text = "";
             Name = "";
             ChildIndex = 0;
-            Type = TokenType.Name;
+            Negate = false;
+            Type = TokenType.Generic;
         }
         public Token(string t)
         {
@@ -352,20 +372,133 @@ namespace Whiplash
             Text = "";
             Name = "";
             ChildIndex = 0;
-            Type = TokenType.Name;
-            if(t == "\0")
+            Negate = false;
+            Type = TokenType.Generic;
+            ValType = ValueType.Name;
+            if (t == "\0")
             {
-                Type = TokenType.Void;
+                ValType = ValueType.Void;
                 return;
             }
-            Text = t.Replace("==", "\x01").Replace("<=", "\x02").Replace(">=", "\x03").Replace("!=", "\x04");
+            Text = t.Replace("==", "\x01").Replace("<=", "\x02").Replace(">=", "\x03").Replace("!=", "\x04").Replace("&&", "\x05").Replace("||", "\x06").Replace("//", "/");
             string ct = "";
             string bound = "";
             string name = "";
             bool pastName = false;
+            int n;
             bool cp = false;
             bool relate = false;
-            TokenType relationType = TokenType.Name;
+            TokenType relationType = TokenType.Generic;
+            string bd = "";
+            int k;
+            bool md = false;
+            for (k = 0; k < Text.Length; k++)
+            {
+                if (Text[k] == '(') bd += '(';
+                else if (Text[k] == ')')
+                {
+                    bd = bd.Remove(bd.Length - 1);
+                    if (bd == "") break;
+                }
+                else if(bd == "" && (Text[k] == ' ' || Text[k] == '=' || Text[k] == '<' || Text[k] == '>' || Text[k] == '\x01' || Text[k] == '\x02' || Text[k] == '\x03' || Text[k] == '\x04' || Text[k] == '\x05' || Text[k] == '\x06'))
+                {
+                    k-=1;
+                    break;
+                }
+            }
+            bd = "";
+            k++;
+            for (int j = k; j < Text.Length; j++)
+            {
+                if (Text[j] != ' ' && Text[j] != '=' && Text[j] != '<' && Text[j] != '>' && Text[j] != '\x01' && Text[j] != '\x02' && Text[j] != '\x03' && Text[j] != '\x04' && Text[j] != '\x05' && Text[j] != '\x06') 
+                    break;
+                if(Text[j] == '=')
+                {
+                    Type = TokenType.Assignment;
+                    ValType = ValueType.Name;
+                    StringBuilder sb = new StringBuilder(Text);
+                    sb[j] = '(';
+                    Text = sb.ToString();
+                    Text += ')';
+                    break;
+                }
+                else if (Text[j] == '<')
+                {
+                    Name = "@&__compare_lf_func";
+                    md = true;
+                }
+                else if (Text[j] == '>')
+                {
+                    Name = "@&__compare_gf_func";
+                    md = true;
+                }
+                else if (Text[j] == '\x01')
+                {
+                    Name = "@&__compare_eqf_func";
+                    md = true;
+                }
+                else if (Text[j] == '\x02')
+                {
+                    Name = "@&__compare_lef_func";
+                    md = true;
+                }
+                else if (Text[j] == '\x03')
+                {
+                    Name = "@&__compare_gef_func";
+                    md = true;
+                }
+                else if (Text[j] == '\x04')
+                {
+                    Name = "@&__compare_nef_func";
+                    md = true;
+                }
+                else if (Text[j] == '\x05')
+                {
+                    Name = "@&__logic_and_func";
+                    md = true;
+                }
+                else if (Text[j] == '\x06')
+                {
+                    Name = "@&__logic_or_func";
+                    md = true;
+                }
+                else if (Text[j] == '+')
+                {
+                    Name = "@&__add_func";
+                    md = true;
+                }
+                else if (Text[j] == '-')
+                {
+                    Name = "@&__sub_func";
+                    md = true;
+                }
+                else if (Text[j] == '*')
+                {
+                    Name = "@&__mul_func";
+                    md = true;
+                }
+                else if (Text[j] == '/')
+                {
+                    Name = "@&__div_func";
+                    md = true;
+                }
+                else if (Text[j] == '%')
+                {
+                    Name = "@&__mod_func";
+                    md = true;
+                }
+                if (md)
+                {
+                    pastName = true;
+                    StringBuilder sb = new StringBuilder(Text);
+                    sb[j] = ',';
+                    Text = sb.ToString();
+                    Text += ',';
+                    Type = TokenType.MethodCall;
+                    ValType = ValueType.MethodCall;
+                    break;
+                }
+            }
             for (int i = 0; i < Text.Length; i++)
             {
                 if (pastName)
@@ -402,6 +535,15 @@ namespace Whiplash
                         }
                         if (ct == Text) return;
                         if (ct.Trim() == "") ct = "\0";
+                        else if (ct.StartsWith("\x01") || ct.StartsWith("\x02") || ct.StartsWith("\x03") || ct.StartsWith("\x04") || ct.StartsWith("\x05") || ct.StartsWith("\x06") || ct.StartsWith("\x07") || ct.StartsWith("\x10") || ct.StartsWith("\x0E") || ct.StartsWith("\x0F"))
+                        {
+                            ct = ct.Remove(0, 1);
+                            for (int j = 0; j < ct.Length; j++)
+                            {
+                                if (ct[0] != ' ') break;
+                                ct = ct.Remove(0, 1);
+                            }
+                        }
                         Tokens.Add(new Token(ct));
                         ct = "";
                         cp = false;
@@ -412,97 +554,23 @@ namespace Whiplash
                     if (Text[i] == '(')
                     {
                         pastName = true;
-                        Type = TokenType.MethodCall;
-                    }
-                    else if (Text[i] == '=' || Text[i] == '<' || Text[i] == '>' || Text[i] == '\x01' || Text[i] == '\x02' || Text[i] == '\x03' || Text[i] == '\x04' || Text[i] == '\x05' || Text[i] == '\x06' || Text[i] == '\x07' || Text[i] == '\x08')
-                    {
-                        relate = true;
-                        switch (Text[i])
-                        {
-                            case '=':
-                                relationType = TokenType.Assignment;
-                                break;
-                            case '<':
-                                relationType = TokenType.ComparisonLess;
-                                break;
-                            case '>':
-                                relationType = TokenType.ComparisonGreater;
-                                break;
-                            case '\x01':
-                                relationType = TokenType.ComparisonEqual;
-                                break;
-                            case '\x02':
-                                relationType = TokenType.ComparisonLessEqual;
-                                break;
-                            case '\x03':
-                                relationType = TokenType.ComparisonGreaterEqual;
-                                break;
-                            case '\x04':
-                                relationType = TokenType.ComparisonNotEqual;
-                                break;
-                            case '\x05':
-                                relationType = TokenType.Plus;
-                                break;
-                            case '\x06':
-                                relationType = TokenType.Minus;
-                                break;
-                            case '\x07':
-                                relationType = TokenType.Multiply;
-                                break;
-                            case '\x08':
-                                relationType = TokenType.Divide;
-                                break;
-                        }
+                        if(Type != TokenType.Assignment) Type = TokenType.MethodCall;
                     }
                     else name += Text[i];
                 }
-                if (relate)
-                {
-                    i++;
-                    while (i < Text.Length)
-                    {
-                        if (Text[i] != ' ') break;
-                        i++;
-                    }
-                    string backtracking = "";
-                    string cbr = "";
-                    bool mod = false;
-                    while (i < Text.Length)
-                    {
-                        if ((cbr.Length == 0 || (cbr.Length > 0 && cbr[cbr.Length - 1] != '"')) && Text[i] == '(')
-                        {
-                            cbr += '(';
-                            mod = true;
-                        }
-                        else if (Text[i] == '"' && Text[i - i] != '\\')
-                        {
-                            if (cbr.Length > 0 && cbr[cbr.Length - 1] == '"' && Text[i] == '"' && Text[i - 1] != '\\')
-                                cbr = cbr.Remove(cbr.Length - 1);
-                            else cbr += '"';
-                            mod = true;
-                        }
-                        else if (cbr.Length > 0 && cbr[cbr.Length - 1] == '(' && Text[i] == ')')
-                        {
-                            cbr = cbr.Remove(cbr.Length - 1);
-                        }
-                        else if (cbr.Length == 0 && mod) break;
-                        backtracking += Text[i];
-                        i++;
-                    }
-                    Tokens.Add(new Token(backtracking));
-                    Type = relationType;
-                    relate = false;
-                    pastName = true;
-                }
             }
-            Name = name.Trim();
-            int n;
+            if(Name == "") Name = name.Trim();
+            if (Name.StartsWith("!"))
+            {
+                Negate = true;
+                Name = Name.Remove(0, 1);
+            }
             for (int j = 0; j < Text.Length; j++)
             {
                 if (Text[0] != ' ') break;
                 Text = Text.Remove(0, 1);
             }
-            if (Type == TokenType.Name && (Text.StartsWith("\"") || Text.StartsWith("0x") || int.TryParse(Text, out n))) Type = TokenType.Literal;
+            if (ValType == ValueType.Name && (Text.StartsWith("\"") || Text.Trim().StartsWith("0x") || int.TryParse(Text.Trim(), out n))) ValType = ValueType.Literal;
         }
         public Token this[int index]
         {
