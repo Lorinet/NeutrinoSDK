@@ -2,7 +2,7 @@
   "profiles": {
     "Whiplash": {
       "commandName": "Project",
-      "commandLineArgs": "file.py out.ns"
+      "commandLineArgs": "ntrasm.py out.ns"
     }
   }
 }
