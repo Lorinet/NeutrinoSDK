@@ -54,9 +54,107 @@ reg = {}
 meth = []
 var = []
 methcode = {}
-importDirectories = "C:\\Neutrino\\ndk\\whiplash"
+importDirectories = "C:\\Neutrino\\ndk\\whiplash\\"
+
+def error(err, lnu, fil):
+    print("Error: " + err)
+    print("At line " + str(lnu) + " of file " + fil)
+    exit(-1)
+
+def get_var_name(var):
+    pass
+
+def process_statement(stmt):
+    pass
 
 def parse_line(s, lnu, fil):
+    lin = s
+    for g in reg.keys():
+        m = re.search(reg[g], lin)
+        if m:
+            if g == "import":
+                ipa = "..\\" + m.group(0) + ".py"
+                if not os.path.exists(ipa):
+                    ipa = importDirectories + m.group(0) + ".py"
+                if not os.path.exists(ipa):
+                    error("cannot find file: " + m.group(0), lnu, fil)
+            elif g == "include":
+                il.append("#include " + m.group(0) + ".ns")
+            elif g == "def":
+                if m.group(0) in methcode:
+                    error("redefinition of function " + m.group(0), lnu, fil)
+                meth.append(Block(m.group(0), BLOCK_METHOD))
+                methcode[m.group(0)] = []
+                if m.group(0) == "main":
+                    methcode[m.group(0)].append("link whiprt.lnx")
+                cargs = re.split(m.group(1), "\\s*[,]\\s*")
+                for ax in reversed(range(0, len(cargs) - 1)):
+                    if cargs[ax].strip() != "":
+                        methcode[peek(meth).name].append("pop " + peek(meth).name + "!" + cargs[ax])
+                        var.append(peek(meth).name + "!" + cargs[ax])
+            elif g == "inline_il":
+                methcode[peek(meth).name].append(m.group(0))
+            elif g == "if":
+                nm = peek(meth).name + "!&!cond"
+                if nm not in var:
+                    var.append(nm)
+                nm = "_if_" + peek(meth).name + "@" + str(peek(meth).if_count)
+                process_statement("&!cond = " + m.group(0))
+                methcode[peek(meth).name].append("mov " + peek(meth).name + "!&!cond " + peek(meth).name + "!&!orig_cond")
+                methcode[peek(meth).name].append("cmpi " + peek(meth).name + "!&!cond 1")
+                methcode[peek(meth).name].append("jeq " + nm)
+                meth[len(meth) - 1].if_count += 1
+                meth.append(Block(nm, BLOCK_IF, Token(m.group(0))))
+                methcode[nm] = []
+            elif g == "elif":
+                nm = peek(meth).name + "!&!cond"
+                if nm not in var:
+                    var.append(nm)
+                nm = "_elif_" + peek(meth).name + "@" + str(peek(meth).if_count)
+                process_statement("&!cond = !&!orig_cond && " + m.group(0))
+                methcode[peek(meth).name].append("cmpi " + peek(meth).name + "!&!cond 1")
+                methcode[peek(meth).name].append("jeq " + nm)
+                meth[len(meth) - 1].if_count += 1
+                meth.append(Block(nm, BLOCK_IF, Token(m.group(0))))
+                methcode[nm] = []
+                methcode[nm].append("str " + meth[len(meth) - 2] + "!&!orig_cond 1")
+            elif g == "else":
+                nm = "_else_" + peek(meth).name + "@" + str(peek(meth).if_count);
+                methcode[peek(meth).name].append("cmpi " + peek(meth).name + "!&!orig_cond 1")
+                methcode[peek(meth).name].append("jne " + nm)
+                meth[len(meth) - 1].if_count += 1
+                meth.append(Block(nm, BLOCK_IF, Token("")))
+                methcode[nm] = []
+            elif g == "while":
+                nm = peek(meth).name + "!&!cond"
+                if nm not in var:
+                    var.append(nm)
+                nm = "_while_" + peek(meth).name + "@" + str(peek(meth).while_count)
+                methcode[peek(meth).name].append("jmp " + nm)
+                meth[len(meth) - 1].while_count += 1
+                meth.append(Block(nm. BLOCK_WHILE, Token(m.group(0))))
+                methcode[nm] = []
+                process_statement("&!cond = " + m.group(0))
+                methcode[peek(meth).name][len(methcode[peek(meth).name]) - 1] = "pop " + nm + "!&!cond"
+                methcode[peek(meth).name].append("cmpi " + nm + "!&!cond 1")
+                methcode[peek(meth).name].append("ljne &__ret_func")
+            elif g == "return":
+                if peek(meth).block_type == BLOCK_METHOD:
+                    methcode[peek(meth).name].append("ret")
+                    meth.pop()
+                    retp = True
+                else:
+                    methcode[peek(meth).name].append("lj &__ret_func")
+            elif g == "return_val":
+                tkr = parse_line(m.group(0), lnu, fil)
+                if tkr:
+                    if tkr.token_type == TOKEN_LITERAL:
+                        methcode[peek(meth).name].append("spush " + tkr.text)
+                    elif tkr.token_type == TOKEN_NAME:
+                        methcode[peek(meth).name].append("push " + get_var_name(tkr.name))
+                if peek(meth).block_type == BLOCK_METHOD:
+                    
+
     return Token()
 
 print("Neutrino Python Compiler")
@@ -114,3 +212,8 @@ for i in range(len(lines)):
     elif retp:
         retp = False
     parse_line(lines[i], i, infile)
+for k in methcode:
+    il.append(":" + k)
+    if len(methcode[k]) > 0 and not methcode[k][len(methcode[k]) - 1].strip().startswith("ret"):
+        methcode[k].append("ret")
+        il.extend(methcode[k])

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Dynamic;
 using System.IO;
 using System.Text;
@@ -18,12 +19,15 @@ namespace Whiplash
         int tab = 0;
         int prevTab = 0;
         bool retp = false;
+        bool nextShouldInvokeClassConstructor = false;
         List<string> il = new List<string>();
         Dictionary<string, Regex> reg = new Dictionary<string, Regex>();
         Dictionary<string, Regex> textreg = new Dictionary<string, Regex>();
         Stack<Block> meth = new Stack<Block>();
-        List<string> vars = new List<string>();
+        Dictionary<string, ClassTemplate> classes = new Dictionary<string, ClassTemplate>();
+        Dictionary<string, string> vars = new Dictionary<string, string>();
         Dictionary<string, List<string>> methcode = new Dictionary<string, List<string>>();
+        Dictionary<string, string> methRetTypes = new Dictionary<string, string>();
         string importDirectories = Path.Combine(Path.GetPathRoot(Environment.SystemDirectory), "Neutrino\\ndk\\whiplash");
         public void Start(string[] args)
         {
@@ -45,16 +49,17 @@ namespace Whiplash
             reg.Add("import", new Regex("^\\s*import\\s+(\\w+)\\s*$"));
             reg.Add("inline_il", new Regex("^\\s*!\\s*[(][']([#\\w\\s\\(\\)\",=<>!.]*)['][)]\\s*"));
             reg.Add("def", new Regex("^\\s*def\\s+(\\w+)\\s*[(]((\\s*\\w+\\s*[,]{0,1}\\s*)*)[)]:$"));
+            reg.Add("class", new Regex("^\\s*class\\s+(\\w+)\\s*:"));
             reg.Add("return", new Regex("^\\s*return\\s*$"));
-            reg.Add("return_val", new Regex("^\\s*return\\s+(\\w+)$"));
-            reg.Add("return_call", new Regex("^\\s*return\\s*([@\\w\\s\\(\\),=<>!.\"'\\\\+\\-\\*/%:]+)\\s*"));
-            reg.Add("method_call", new Regex("^\\s*([@\\w]+)\\s*[(]([\\w\\s\\(\\),=<>!.\"'\\\\+\\-\\*/%:]*)[)]\\s*"));
-            reg.Add("assign_var_var", new Regex("^\\s*(\\w+)\\s*=\\s*((?![\\d]{1})\\w+)\\s*$"));
-            reg.Add("assign_var_call", new Regex("^\\s*(\\w+)\\s*=\\s*([@\\w\\s\\(\\),=<>!.\"'\\\\+\\-\\*/%:]+)\\s*"));
-            reg.Add("if", new Regex("^\\s*if\\s*([\\w\\s=!<>,()\"'\\\\@+\\-\\*/%:]+)\\s*:\\s*$"));
-            reg.Add("elif", new Regex("^\\s*elif\\s*([\\w\\s=!<>,()\"'\\\\@+\\-\\*/%:]+)\\s*:\\s*$"));
+            reg.Add("return_val", new Regex("^\\s*return\\s+([\\w\\.]+)$"));
+            reg.Add("return_call", new Regex("^\\s*return\\s*([@\\w\\s\\(\\),=<>!.\"'\\\\+\\-\\*/%:\\.]+)\\s*"));
+            reg.Add("method_call", new Regex("^\\s*([@\\w]+)\\s*[(]([\\w\\s\\(\\),=<>!.\"'\\\\+\\-\\*/%:\\.]*)[)]\\s*"));
+            reg.Add("assign_var_var", new Regex("^\\s*([\\w\\.]+)\\s*=\\s*((?![\\d]{1})[\\w\\.]+)\\s*$"));
+            reg.Add("assign_var_call", new Regex("^\\s*([\\w\\.]+)\\s*=\\s*([@\\w\\s\\(\\),=<>!.\"'\\\\+\\-\\*/%:\\.]+)\\s*"));
+            reg.Add("if", new Regex("^\\s*if\\s*([\\w\\s=!<>,()\"'\\\\@+\\-\\*/%:\\.]+)\\s*:\\s*$"));
+            reg.Add("elif", new Regex("^\\s*elif\\s*([\\w\\s=!<>,()\"'\\\\@+\\-\\*/%:\\.]+)\\s*:\\s*$"));
             reg.Add("else", new Regex("^\\s*else\\s*:\\s*$"));
-            reg.Add("while", new Regex("^\\s*while\\s*([\\w\\s=!<>,()\"'\\\\@+\\-\\*/%]+)\\s*:\\s*$"));
+            reg.Add("while", new Regex("^\\s*while\\s*([\\w\\s=!<>,()\"'\\\\@+\\-\\*/%\\.]+)\\s*:\\s*$"));
             textreg.Add("str_lit", new Regex("^\\s*(\"{1}([\\w\\s]*(\\\\|[\\w\\s\",?!])*)*((?!\\\\)\"){1})\\s*$"));
             textreg.Add("hex_lit", new Regex("^\\s*?(0x[\\dABCDEF]+)\\s*$"));
             textreg.Add("dec_lit", new Regex("^\\s*?(\\d)+\\s*$"));
@@ -83,22 +88,10 @@ namespace Whiplash
                 {
                     for (int id = 0; id < prevTab - tab; id++)
                     {
-                        if(meth.Peek().Type == BlockType.While)
-                        {
-                            /*int ind = 0;
-                            while (methcode[meth.Peek().Name][ind] != "#MARKER")
-                            {
-                                ind++;
-                            }
-                            ind++;
-                            while (methcode[meth.Peek().Name][ind] != "#MARKER")
-                            {
-                                methcode[meth.Peek().Name].Add(methcode[meth.Peek().Name][ind]);
-                                methcode[meth.Peek().Name].RemoveAt(ind);
-                            }
-                            methcode[meth.Peek().Name].RemoveAt(ind);*/
+                        if (meth.Peek().Type == BlockType.While)
                             methcode[meth.Peek().Name].Add("lj " + meth.Peek().Name);
-                        }
+                        else if (meth.Peek().Type == BlockType.Class)
+                            methcode[meth.Peek().Name].Add("push " + meth.Peek().Name + "!self");
                         methcode[meth.Peek().Name].Add("ret");
                         meth.Pop();
                     }
@@ -113,6 +106,8 @@ namespace Whiplash
                 il.AddRange(methcode[k]);
             }
             File.WriteAllLines(outfile, il.ToArray());
+            // Only for testing
+            Process.Start("python", "C:\\Neutrino\\ndk\\ntrasm.py " + outfile + " C:\\Neutrino\\bin\\" + outfile.Replace(".ns", ".lex"));
         }
         Token ParseLine(string s, int lnu, string fil)
         {
@@ -145,22 +140,42 @@ namespace Whiplash
                         meth.Push(new Block(m.Groups[1].ToString(), BlockType.Method));
                         methcode.Add(m.Groups[1].ToString(), new List<string>());
                         if (m.Groups[1].ToString() == "main") methcode[m.Groups[1].ToString()].Add("link whiprt.lnx");
+                        else if (m.Groups[1].ToString() == "__init__" && meth.ToArray()[1].Type == BlockType.Class)
+                        {
+                            methcode.Remove(meth.Peek().Name);
+                            meth.Peek().Name = meth.ToArray()[1].Name + "!__init__";
+                            methcode.Add(meth.Peek().Name, new List<string>());
+                            vars.Add(meth.Peek().Name + "!self", meth.ToArray()[1].Name);
+                            methcode[meth.ToArray()[1].Name].Add("push " + meth.ToArray()[1].Name + "!self");
+                            methcode[meth.ToArray()[1].Name].Add("call " + meth.Peek().Name);
+                            SetMethRetType(meth.Peek().Name, meth.ToArray()[1].Name);
+                        }
                         string[] cargs = Regex.Split(m.Groups[2].ToString(), "\\s*[,]\\s*");
                         for (int ax = cargs.Length - 1; ax >= 0; ax--)
                         {
                             if (cargs[ax].Trim() != "")
                             {
                                 methcode[meth.Peek().Name].Add("pop " + meth.Peek() + "!" + cargs[ax]);
-                                vars.Add(meth.Peek() + "!" + cargs[ax]);
+                                if (!vars.ContainsKey(meth.Peek().Name + "!" + cargs[ax])) vars.Add(meth.Peek() + "!" + cargs[ax], "");
                             }
                         }
+                    }
+                    else if (g == "class")
+                    {
+                        if (methcode.ContainsKey(m.Groups[1].ToString())) Error("Redefinition of " + m.Groups[1].ToString(), lnu, fil);
+                        meth.Push(new Block(m.Groups[1].ToString(), BlockType.Class));
+                        methcode.Add(m.Groups[1].ToString(), new List<string>());
+                        methcode[meth.Peek().Name].Add("vac");
+                        methcode[meth.Peek().Name].Add("pop " + meth.Peek().Name + "!self");
+                        vars.Add(meth.Peek().Name + "!self", meth.Peek().Name);
+                        classes.Add(meth.Peek().Name, new ClassTemplate(meth.Peek().Name));
                     }
                     else if (g == "inline_il")
                         methcode[meth.Peek().Name].Add(m.Groups[1].ToString());
                     else if (g == "if")
                     {
                         nm = meth.Peek().Name + "!&!cond";
-                        if (!vars.Contains(nm)) vars.Add(nm);
+                        if (!vars.ContainsKey(nm)) vars.Add(nm, "");
                         nm = "_if_" + meth.Peek().Name + "@" + meth.Peek().IfCount.ToString();
                         ProcessStatement("&!cond = " + m.Groups[1].ToString());
                         methcode[meth.Peek().Name].Add("mov " + meth.Peek().Name + "!&!cond " + meth.Peek().Name + "!&!orig_cond");
@@ -173,10 +188,9 @@ namespace Whiplash
                     else if (g == "elif")
                     {
                         nm = meth.Peek().Name + "!&!cond";
-                        if (!vars.Contains(nm)) vars.Add(nm);
+                        if (!vars.ContainsKey(nm)) vars.Add(nm, "");
                         nm = "_elif_" + meth.Peek().Name + "@" + meth.Peek().IfCount.ToString();
                         ProcessStatement("&!cond = !&!orig_cond && " + m.Groups[1].ToString());
-                        //methcode[meth.Peek().Name][methcode[meth.Peek().Name].Count - 1] = "pop " + nm + "!&!cond";
                         methcode[meth.Peek().Name].Add("cmpi " + meth.Peek().Name + "!&!cond 1");
                         methcode[meth.Peek().Name].Add("jeq " + nm);
                         meth.Peek().IfCount += 1;
@@ -196,8 +210,8 @@ namespace Whiplash
                     else if (g == "while")
                     {
                         nm = meth.Peek().Name + "!&!cond";
-                        if (!vars.Contains(nm)) vars.Add(nm);
-                        nm = "_while_" + meth.Peek().Name + "@" + meth.Peek().IfCount.ToString();
+                        if (!vars.ContainsKey(nm)) vars.Add(nm, "");
+                        nm = "_while_" + meth.Peek().Name + "@" + meth.Peek().WhileCount.ToString();
                         methcode[meth.Peek().Name].Add("jmp " + nm);
                         meth.Peek().WhileCount += 1;
                         meth.Push(new Block(nm, BlockType.While, new Token(m.Groups[1].ToString())));
@@ -230,6 +244,7 @@ namespace Whiplash
                             else if (tkr.Type == TokenType.Name)
                             {
                                 methcode[meth.Peek().Name].Add("push " + GetVarName(tkr.Name));
+                                SetMethRetType(meth.Peek().Name, ResolveObjectChildren(GetVarName(tkr.Name)).classType);
                             }
                         }
                         if (meth.Peek().Type == BlockType.Method)
@@ -240,10 +255,21 @@ namespace Whiplash
                         }
                         else methcode[meth.Peek().Name].Add("lj &__ret_func");
                     }
-                    else if (g == "assign_var_var") 
-                        methcode[meth.Peek().Name].Add("mov " + GetVarName(m.Groups[1].ToString()) + " " + GetVarName(m.Groups[2].ToString()));
+                    else if (g == "assign_var_var")
+                    {
+                        // Resolve children!
+                        (bool isMember, string classType, string memberName) cr = ResolveObjectChildren(GetVarName(m.Groups[2].ToString()));
+                        if (cr.isMember) methcode[meth.Peek().Name].Add("vai");
+                        else methcode[meth.Peek().Name].Add("push " + GetVarName(m.Groups[2].ToString()));
+                        if (ResolveObjectChildren(GetVarName(m.Groups[1].ToString())).isMember) methcode[meth.Peek().Name].Add("vas");
+                        else
+                        {
+                            methcode[meth.Peek().Name].Add("pop " + GetVarName(m.Groups[1].ToString()));
+                            vars[GetVarName(m.Groups[1].ToString())] = cr.classType;
+                        }
+                    }
                     else if (g == "assign_var_call" || g == "method_call") ProcessStatement(lin);
-                    else if(g == "return_call")
+                    else if (g == "return_call")
                     {
                         ProcessStatement(m.Groups[1].ToString());
                         if (meth.Peek().Type == BlockType.Method)
@@ -271,6 +297,8 @@ namespace Whiplash
                 Token tk = new Token(stmt);
                 Token tkr = tk;
                 int lev = 0;
+                string prevCall = "";
+                (bool isMember, string classType, string memberName) re;
                 while (true)
                 {
                     if (tkr.ChildIndex < tkr.Tokens.Count)
@@ -284,8 +312,22 @@ namespace Whiplash
                         lev--;
                         if (tkr.Tokens.Count == 0)
                         {
-                            if (tkr.Type == TokenType.Name) methcode[meth.Peek().Name].Add("push " + GetVarName(tkr.Name));
-                            else if (tkr.Type == TokenType.Literal) methcode[meth.Peek().Name].Add("spush " + tkr.Text);
+                            if (tkr.Type == TokenType.Name)
+                            {
+                                re = ResolveObjectChildren(GetVarName(tkr.Name));
+                                if (re.isMember)
+                                {
+                                    methcode[meth.Peek().Name].Add("vai");
+                                }
+                                else
+                                {
+                                    methcode[meth.Peek().Name].Add("push " + GetVarName(tkr.Name));
+                                }
+                            }
+                            else if (tkr.Type == TokenType.Literal)
+                            {
+                                methcode[meth.Peek().Name].Add("spush " + tkr.Text);
+                            }
                             if (tkr.Negate) methcode[meth.Peek().Name].Add("extcall &__not_func");
                         }
                         tkr = Token.Node(ref tk, lev);
@@ -294,19 +336,87 @@ namespace Whiplash
                         {
                             if (tkr.Type == TokenType.MethodCall)
                             {
-                                if (tkr.Name[0] == '@') methcode[meth.Peek().Name].Add("extcall " + tkr.Name.Remove(0, 1));
-                                else methcode[meth.Peek().Name].Add("extcall " + tkr.Name);
+                                if (tkr.Name[0] == '~') methcode[meth.Peek().Name].Add(tkr.Name.Remove(0, 1));
+                                else
+                                {
+                                    methcode[meth.Peek().Name].Add("extcall " + tkr.Name);
+                                }
                                 if (tkr.Negate) methcode[meth.Peek().Name].Add("extcall &__not_func");
                             }
                             else if (tkr.Type == TokenType.Assignment)
                             {
                                 if (tkr.Negate) methcode[meth.Peek().Name].Add("extcall &__not_func");
-                                methcode[meth.Peek().Name].Add("pop " + GetVarName(tkr.Name));
+                                prevCall = methcode[meth.Peek().Name][methcode[meth.Peek().Name].Count - 1];
+                                if (prevCall.StartsWith("extcall"))
+                                {
+                                    if(classes.ContainsKey(prevCall.Split(' ')[1]))
+                                    {
+                                        vars[GetVarName(tkr.Name)] = prevCall.Split(' ')[1];
+                                    }
+                                }
+                                re = ResolveObjectChildren(GetVarName(tkr.Name));
+                                if (re.isMember)
+                                {
+                                    methcode[meth.Peek().Name].Add("vas");
+                                }
+                                else
+                                {
+                                    methcode[meth.Peek().Name].Add("pop " + GetVarName(tkr.Name));
+                                    if (meth.Peek().Type == BlockType.Class)
+                                    {
+                                        classes[meth.Peek().Name].CreateField(tkr.Name);
+                                        methcode[meth.Peek().Name].RemoveAt(methcode[meth.Peek().Name].Count - 1);
+                                        methcode[meth.Peek().Name].Add("push " + meth.Peek().Name + "!self");
+                                        methcode[meth.Peek().Name].Add("vad");
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
+        }
+        (bool isMember, string classType, string memberName) ResolveObjectChildren(string name)
+        {
+            // Return class of last child
+            string nm = name;
+            string par = "";
+            string chi = "";
+            bool pastPar = false;
+            bool pastFirst = false;
+            if (!name.Contains('.')) return (false, vars[name], name);
+            for (int i = 0; i < nm.Length; i++)
+            {
+                if (nm[i] != '.')
+                {
+                    if (!pastPar && !pastFirst) par += nm[i];
+                    else chi += nm[i];
+                }
+                if (nm[i] == '.' || i == nm.Length - 1)
+                {
+                    if(pastPar || i == nm.Length - 1)
+                    {
+                        string cl = vars[par];
+                        methcode[meth.Peek().Name].Add("spush " + classes[vars[par]].GetFieldIndex(chi));
+                        methcode[meth.Peek().Name].Add("push " + meth.Peek().Name + "!__father__");
+                        if (i < nm.Length - 1)
+                        {
+                            methcode[meth.Peek().Name].Add("vai");
+                            methcode[meth.Peek().Name].Add("pop " + meth.Peek().Name + "!__father__");
+                            par = vars[par] + "!" + chi;
+                            chi = "";
+                            pastFirst = true;
+                        }
+                        else return (true, vars[vars[par] + "!" + chi], vars[par] + "!" + chi);
+                    }
+                    else if(!pastFirst)
+                    {
+                        methcode[meth.Peek().Name].Add("mov " + par + " " + meth.Peek().Name + "!__father__");
+                    }
+                    pastPar = !pastPar;
+                }
+            }
+            return (true, vars[vars[par] + "!" + chi], vars[par] + "!" + chi);
         }
         string GetVarName(string var)
         {
@@ -314,15 +424,25 @@ namespace Whiplash
             for (int i = 0; i < meth.Count; i++)
             {
                 nm = meth.ToArray()[i] + "!" + var;
-                if (vars.Contains(nm)) break;
+                if (vars.ContainsKey(nm)) break;
                 else nm = "";
             }
             if (nm == "")
             {
                 nm = meth.Peek() + "!" + var;
-                vars.Add(nm);
+                vars.Add(nm, "");
             }
             return nm;
+        }
+        string GetMethRetType(string meth)
+        {
+            if (methRetTypes.ContainsKey(meth)) return methRetTypes[meth];
+            return "";
+        }
+        void SetMethRetType(string meth, string type)
+        {
+            if (!methRetTypes.ContainsKey(meth)) methRetTypes.Add(meth, type);
+            else methRetTypes[meth] = type;
         }
         void Error(string err, int ln, string fil)
         {
@@ -333,6 +453,44 @@ namespace Whiplash
             Environment.Exit(-1);
         }
     }
+    class ClassTemplate
+    {
+        public string TypeName { get; set; }
+        public Dictionary<string, int> Fields { get; set; }
+        private int FieldIndex { get; set; }
+        public ClassTemplate(string name)
+        {
+            TypeName = name;
+            Fields = new Dictionary<string, int>();
+            FieldIndex = 0;
+        }
+        public void CreateField(string name)
+        {
+            if (!Fields.ContainsKey(name))
+            {
+                Fields.Add(name, FieldIndex);
+                FieldIndex++;
+            }
+        }
+        public int GetFieldIndex(string name) => Fields[name];
+    }
+
+    class Variable
+    {
+        public string Name { get; set; }
+        public string Class { get; set; }
+        public Variable(string name)
+        {
+            Name = name;
+            Class = "";
+        }
+        public Variable(string name, string cl)
+        {
+            Name = name;
+            Class = cl;
+        }
+    }
+
     class Block
     {
         public string Name { get; set; }
@@ -365,17 +523,17 @@ namespace Whiplash
         Method,
         While,
         If,
-        For
+        For,
+        Class
     }
     enum TokenType
     {
         Name,
         MethodCall,
         Assignment,
-        Increment,
-        Decrement,
         Void,
-        Literal
+        Literal,
+        ClassMember
     }
     class Token
     {
@@ -385,11 +543,13 @@ namespace Whiplash
         public int ChildIndex { get; set; }
         public bool Negate { get; set; }
         public TokenType Type { get; set; }
+        public string Father { get; set; }
         public Token()
         {
             Tokens = new List<Token>();
             Text = "";
             Name = "";
+            Father = "";
             ChildIndex = 0;
             Negate = false;
             Type = TokenType.Name;
@@ -399,6 +559,7 @@ namespace Whiplash
             Tokens = new List<Token>();
             Text = "";
             Name = "";
+            Father = "";
             ChildIndex = 0;
             Negate = false;
             Type = TokenType.Name;
@@ -436,9 +597,9 @@ namespace Whiplash
             k++;
             for (int j = k; j < Text.Length; j++)
             {
-                if (Text[j] != ' ' && Text[j] != '=' && Text[j] != '<' && Text[j] != '>' && Text[j] != '+' && Text[j] != '-' && Text[j] != '*' && Text[j] != '/' && Text[j] != '%' && Text[j] != '\x01' && Text[j] != '\x02' && Text[j] != '\x03' && Text[j] != '\x04' && Text[j] != '\x05' && Text[j] != '\x06') 
+                if (Text[j] != ' ' && Text[j] != '=' && Text[j] != '<' && Text[j] != '>' && Text[j] != '+' && Text[j] != '-' && Text[j] != '*' && Text[j] != '/' && Text[j] != '%' && Text[j] != '\x01' && Text[j] != '\x02' && Text[j] != '\x03' && Text[j] != '\x04' && Text[j] != '\x05' && Text[j] != '\x06')
                     break;
-                if(Text[j] == '=')
+                if (Text[j] == '=')
                 {
                     Type = TokenType.Assignment;
                     StringBuilder sb = new StringBuilder(Text);
@@ -489,22 +650,22 @@ namespace Whiplash
                 }
                 else if (Text[j] == '+')
                 {
-                    Name = "@&__add_func";
+                    Name = "~add";
                     cp = true;
                 }
                 else if (Text[j] == '-')
                 {
-                    Name = "@&__sub_func";
+                    Name = "~sub";
                     cp = true;
                 }
                 else if (Text[j] == '*')
                 {
-                    Name = "@&__mul_func";
+                    Name = "~mul";
                     cp = true;
                 }
                 else if (Text[j] == '/')
                 {
-                    Name = "@&__div_func";
+                    Name = "~div";
                     cp = true;
                 }
                 else if (Text[j] == '%')
@@ -577,22 +738,21 @@ namespace Whiplash
                 }
                 else
                 {
-                    if(Text[i] == '"')
+                    if (Text[i] == '"')
                     {
                         pastName = true;
                         Type = TokenType.Literal;
-                        //ValType = ValueType.Literal;
                         name = Text;
                     }
                     else if (Text[i] == '(')
                     {
                         pastName = true;
-                        if(Type != TokenType.Assignment) Type = TokenType.MethodCall;
+                        if (Type != TokenType.Assignment) Type = TokenType.MethodCall;
                     }
                     else name += Text[i];
                 }
             }
-            if(Name == "") Name = name.Trim();
+            if (Name == "") Name = name.Trim();
             if (Name.StartsWith("!"))
             {
                 Negate = true;
