@@ -18,6 +18,8 @@ namespace Whiplash
         string version = "0.1f";
         int tab = 0;
         int prevTab = 0;
+        int lineNumber = 0;
+        string currentFile = "";
         bool retp = false;
         bool nextShouldInvokeClassConstructor = false;
         List<string> il = new List<string>();
@@ -45,6 +47,8 @@ namespace Whiplash
             il.Add("ret");
             List<string> lines = new List<string>(File.ReadAllLines(infile));
             lines.Add("");
+            reg.Add("empty_line", new Regex("^\\s*$"));
+            reg.Add("comment", new Regex("^\\s*#.*"));
             reg.Add("include", new Regex("^\\s*include\\s+(\\w+)\\s*$"));
             reg.Add("import", new Regex("^\\s*import\\s+(\\w+)\\s*$"));
             reg.Add("inline_il", new Regex("^\\s*!\\s*[(][']([#\\w\\s\\(\\)\",=<>!.]*)['][)]\\s*"));
@@ -53,7 +57,7 @@ namespace Whiplash
             reg.Add("return", new Regex("^\\s*return\\s*$"));
             reg.Add("return_val", new Regex("^\\s*return\\s+([\\w\\.]+)$"));
             reg.Add("return_call", new Regex("^\\s*return\\s*([@\\w\\s\\(\\),=<>!.\"'\\\\+\\-\\*/%:\\.]+)\\s*"));
-            reg.Add("method_call", new Regex("^\\s*([@\\w]+)\\s*[(]([\\w\\s\\(\\),=<>!.\"'\\\\+\\-\\*/%:\\.]*)[)]\\s*"));
+            reg.Add("method_call", new Regex("^\\s*([@\\w\\.]+)\\s*[(]([\\w\\s\\(\\),=<>!.\"'\\\\+\\-\\*/%:\\.]*)[)]\\s*"));
             reg.Add("assign_var_var", new Regex("^\\s*([\\w\\.]+)\\s*=\\s*((?![\\d]{1})[\\w\\.]+)\\s*$"));
             reg.Add("assign_var_call", new Regex("^\\s*([\\w\\.]+)\\s*=\\s*([@\\w\\s\\(\\),=<>!.\"'\\\\+\\-\\*/%:\\.]+)\\s*"));
             reg.Add("if", new Regex("^\\s*if\\s*([\\w\\s=!<>,()\"'\\\\@+\\-\\*/%:\\.]+)\\s*:\\s*$"));
@@ -67,10 +71,10 @@ namespace Whiplash
             methcode.Add("main", new List<string>());
             meth.Push(new Block("main", BlockType.Method));
             methcode["main"].Add("link whiprt.lnx");
+            currentFile = infile;
             for (int i = 0; i < lines.Count; i++)
             {
                 string ln = lines[i];
-                if (ln.Trim() == "" || ln.Trim()[0] == '#') continue;
                 prevTab = tab;
                 if (ln.StartsWith("\t"))
                     tab = ln.Split('\t').Length - 1;
@@ -90,14 +94,19 @@ namespace Whiplash
                     {
                         if (meth.Peek().Type == BlockType.While)
                             methcode[meth.Peek().Name].Add("lj " + meth.Peek().Name);
-                        else if (meth.Peek().Type == BlockType.Class)
+                        else if (meth.Peek().Name.Split('!').Length == 2 && meth.Peek().Name.Split('!')[1] == "__init__")
                             methcode[meth.Peek().Name].Add("push " + meth.Peek().Name + "!self");
                         methcode[meth.Peek().Name].Add("ret");
                         meth.Pop();
                     }
                 }
                 else if (retp) retp = false;
-                ParseLine(lines[i], i, infile);
+                lineNumber = i;
+                ParseLine(lines[i]);
+            }
+            foreach(KeyValuePair<string, ClassTemplate> ct in classes)
+            {
+                methcode["main"].Insert(1, "call " + ct.Key);
             }
             foreach (string k in methcode.Keys)
             {
@@ -109,7 +118,7 @@ namespace Whiplash
             // Only for testing
             Process.Start("python", "C:\\Neutrino\\ndk\\ntrasm.py " + outfile + " C:\\Neutrino\\bin\\" + outfile.Replace(".ns", ".lex"));
         }
-        Token ParseLine(string s, int lnu, string fil)
+        Token ParseLine(string s)
         {
             Match m;
             string nm = "";
@@ -121,7 +130,8 @@ namespace Whiplash
                 m = reg[g].Match(lin);
                 if (m.Success)
                 {
-                    if (g == "import")
+                    if (g == "empty_line" || g == "comment") break;
+                    else if (g == "import")
                     {
                         string ipa = "..\\" + m.Groups[1] + ".py";
                         if (!File.Exists(ipa))
@@ -130,28 +140,42 @@ namespace Whiplash
                         }
                         if (!File.Exists(ipa))
                         {
-                            Error("Cannot find file: " + m.Groups[1], lnu, fil);
+                            Error("Cannot find file: " + m.Groups[1]);
                         }
                     }
                     else if (g == "include") il.Add("#include " + m.Groups[1] + ".ns");
                     else if (g == "def")
                     {
-                        if (methcode.ContainsKey(m.Groups[1].ToString())) Error("Redefinition of " + m.Groups[1].ToString(), lnu, fil);
+                        if (methcode.ContainsKey(m.Groups[1].ToString())) Error("Redefinition of " + m.Groups[1].ToString());
                         meth.Push(new Block(m.Groups[1].ToString(), BlockType.Method));
                         methcode.Add(m.Groups[1].ToString(), new List<string>());
+                        bool isMember = meth.ToArray()[1].Type == BlockType.Class;
+                        List<string> cargs = new List<string>(Regex.Split(m.Groups[2].ToString(), "\\s*[,]\\s*"));
                         if (m.Groups[1].ToString() == "main") methcode[m.Groups[1].ToString()].Add("link whiprt.lnx");
-                        else if (m.Groups[1].ToString() == "__init__" && meth.ToArray()[1].Type == BlockType.Class)
+                        else if (m.Groups[1].ToString() == "__init__" && isMember)
                         {
                             methcode.Remove(meth.Peek().Name);
                             meth.Peek().Name = meth.ToArray()[1].Name + "!__init__";
                             methcode.Add(meth.Peek().Name, new List<string>());
                             vars.Add(meth.Peek().Name + "!self", meth.ToArray()[1].Name);
-                            methcode[meth.ToArray()[1].Name].Add("push " + meth.ToArray()[1].Name + "!self");
-                            methcode[meth.ToArray()[1].Name].Add("call " + meth.Peek().Name);
+                            //methcode[meth.ToArray()[1].Name].Add("push " + meth.ToArray()[1].Name + "!self");
+                            //methcode[meth.ToArray()[1].Name].Add("call " + meth.Peek().Name);
+                            cargs.RemoveAt(0);
                             SetMethRetType(meth.Peek().Name, meth.ToArray()[1].Name);
                         }
-                        string[] cargs = Regex.Split(m.Groups[2].ToString(), "\\s*[,]\\s*");
-                        for (int ax = cargs.Length - 1; ax >= 0; ax--)
+                        else if (isMember)
+                        {
+                            methcode.Remove(meth.Peek().Name);
+                            meth.Peek().Name = meth.ToArray()[1].Name + "!" + meth.Peek().Name;
+                            methcode.Add(meth.Peek().Name, new List<string>());
+                            vars.Add(meth.Peek().Name + "!self", meth.ToArray()[1].Name);
+                            classes[meth.ToArray()[1].Name].Fields.Add(m.Groups[1].ToString(), (-1, true));
+                            vars.Add(meth.Peek().Name, "");
+                            // put self at the end so that we can push self automatically
+                            cargs.Add(cargs[0]);
+                            cargs.RemoveAt(0);
+                        }
+                        for (int ax = cargs.Count - 1; ax >= 0; ax--)
                         {
                             if (cargs[ax].Trim() != "")
                             {
@@ -159,15 +183,17 @@ namespace Whiplash
                                 if (!vars.ContainsKey(meth.Peek().Name + "!" + cargs[ax])) vars.Add(meth.Peek() + "!" + cargs[ax], "");
                             }
                         }
+                        if (m.Groups[1].ToString() == "__init__" && isMember)
+                        {
+                            methcode[meth.Peek().Name].Add("vac");
+                            methcode[meth.Peek().Name].Add("pop " + meth.Peek().Name + "!self");
+                        }
                     }
                     else if (g == "class")
                     {
-                        if (methcode.ContainsKey(m.Groups[1].ToString())) Error("Redefinition of " + m.Groups[1].ToString(), lnu, fil);
+                        if (methcode.ContainsKey(m.Groups[1].ToString())) Error("Redefinition of " + m.Groups[1].ToString());
                         meth.Push(new Block(m.Groups[1].ToString(), BlockType.Class));
                         methcode.Add(m.Groups[1].ToString(), new List<string>());
-                        methcode[meth.Peek().Name].Add("vac");
-                        methcode[meth.Peek().Name].Add("pop " + meth.Peek().Name + "!self");
-                        vars.Add(meth.Peek().Name + "!self", meth.Peek().Name);
                         classes.Add(meth.Peek().Name, new ClassTemplate(meth.Peek().Name));
                     }
                     else if (g == "inline_il")
@@ -234,7 +260,7 @@ namespace Whiplash
                     }
                     else if (g == "return_val")
                     {
-                        tkr = ParseLine(m.Groups[1].ToString(), lnu, fil);
+                        tkr = ParseLine(m.Groups[1].ToString());
                         if (tkr != null)
                         {
                             if (tkr.Type == TokenType.Literal)
@@ -258,7 +284,7 @@ namespace Whiplash
                     else if (g == "assign_var_var")
                     {
                         // Resolve children!
-                        (bool isMember, string classType, string memberName) cr = ResolveObjectChildren(GetVarName(m.Groups[2].ToString()));
+                        (bool isMember, string classType, string memberName, string parent) cr = ResolveObjectChildren(GetVarName(m.Groups[2].ToString()));
                         if (cr.isMember) methcode[meth.Peek().Name].Add("vai");
                         else methcode[meth.Peek().Name].Add("push " + GetVarName(m.Groups[2].ToString()));
                         if (ResolveObjectChildren(GetVarName(m.Groups[1].ToString())).isMember) methcode[meth.Peek().Name].Add("vas");
@@ -298,7 +324,8 @@ namespace Whiplash
                 Token tkr = tk;
                 int lev = 0;
                 string prevCall = "";
-                (bool isMember, string classType, string memberName) re;
+                (bool isMember, string classType, string memberName, string parent) re;
+                (bool isClassVar, string identifier) cv;
                 while (true)
                 {
                     if (tkr.ChildIndex < tkr.Tokens.Count)
@@ -314,14 +341,19 @@ namespace Whiplash
                         {
                             if (tkr.Type == TokenType.Name)
                             {
-                                re = ResolveObjectChildren(GetVarName(tkr.Name));
+                                re = ResolveObjectChildren(GetVarNameDot(tkr.Name));
                                 if (re.isMember)
                                 {
                                     methcode[meth.Peek().Name].Add("vai");
                                 }
                                 else
                                 {
-                                    methcode[meth.Peek().Name].Add("push " + GetVarName(tkr.Name));
+                                    cv = GetClassVar(tkr.Name);
+                                    if(cv.isClassVar)
+                                    {
+                                        methcode[meth.Peek().Name].Add("push " + cv.identifier);
+                                    }
+                                    else methcode[meth.Peek().Name].Add("push " + GetVarName(tkr.Name));
                                 }
                             }
                             else if (tkr.Type == TokenType.Literal)
@@ -336,10 +368,21 @@ namespace Whiplash
                         {
                             if (tkr.Type == TokenType.MethodCall)
                             {
+                                // FIXME: This is a hack. Really you shouldn't check for arithmetic operations
+                                //        based on initial character. Beginner programmers forget about invalid
+                                //        python characters in identifiers and then complain about random errors.
                                 if (tkr.Name[0] == '~') methcode[meth.Peek().Name].Add(tkr.Name.Remove(0, 1));
                                 else
                                 {
-                                    methcode[meth.Peek().Name].Add("extcall " + tkr.Name);
+                                    re = ResolveObjectChildren(GetVarNameDot(tkr.Name), false);
+                                    if (re.isMember)
+                                    {
+                                        ResolveObjectChildren(GetVarNameDot(tkr.Name));
+                                        methcode[meth.Peek().Name].RemoveAt(methcode[meth.Peek().Name].Count - 2);
+                                        methcode[meth.Peek().Name].Add("extcall " + re.memberName);
+                                    }
+                                    else if (classes.ContainsKey(tkr.Name)) methcode[meth.Peek().Name].Add("extcall " + tkr.Name + "!__init__");
+                                    else methcode[meth.Peek().Name].Add("extcall " + tkr.Name);
                                 }
                                 if (tkr.Negate) methcode[meth.Peek().Name].Add("extcall &__not_func");
                             }
@@ -349,26 +392,32 @@ namespace Whiplash
                                 prevCall = methcode[meth.Peek().Name][methcode[meth.Peek().Name].Count - 1];
                                 if (prevCall.StartsWith("extcall"))
                                 {
-                                    if(classes.ContainsKey(prevCall.Split(' ')[1]))
+                                    if(classes.ContainsKey(prevCall.Split(' ')[1].Split('!')[0]))
                                     {
-                                        vars[GetVarName(tkr.Name)] = prevCall.Split(' ')[1];
+                                        vars[GetVarName(tkr.Name)] = prevCall.Split(' ')[1].Split('!')[0];
                                     }
                                 }
-                                re = ResolveObjectChildren(GetVarName(tkr.Name));
+                                re = ResolveObjectChildren(GetVarNameDot(tkr.Name));
                                 if (re.isMember)
                                 {
-                                    methcode[meth.Peek().Name].Add("vas");
+                                    if (!classes[GetVarType(re.parent)].Fields[re.memberName.Split('!')[1]].initialized)
+                                    {
+                                        classes[GetVarType(re.parent)].SetInitialized(re.memberName.Split('!')[1]);
+                                        methcode[meth.Peek().Name].RemoveAt(methcode[meth.Peek().Name].Count - 2);
+                                        methcode[meth.Peek().Name].Add("vad");
+                                    }
+                                    else methcode[meth.Peek().Name].Add("vas");
                                 }
                                 else
                                 {
                                     methcode[meth.Peek().Name].Add("pop " + GetVarName(tkr.Name));
-                                    if (meth.Peek().Type == BlockType.Class)
-                                    {
-                                        classes[meth.Peek().Name].CreateField(tkr.Name);
-                                        methcode[meth.Peek().Name].RemoveAt(methcode[meth.Peek().Name].Count - 1);
-                                        methcode[meth.Peek().Name].Add("push " + meth.Peek().Name + "!self");
-                                        methcode[meth.Peek().Name].Add("vad");
-                                    }
+                                    //if (meth.Peek().Type == BlockType.Class)
+                                    //{
+                                    //    classes[meth.Peek().Name].CreateField(tkr.Name);
+                                    //    methcode[meth.Peek().Name].RemoveAt(methcode[meth.Peek().Name].Count - 1);
+                                    //    methcode[meth.Peek().Name].Add("push " + meth.Peek().Name + "!self");
+                                    //    methcode[meth.Peek().Name].Add("vad");
+                                    //}
                                 }
                             }
                         }
@@ -376,50 +425,80 @@ namespace Whiplash
                 }
             }
         }
-        (bool isMember, string classType, string memberName) ResolveObjectChildren(string name)
+        (bool isMember, string classType, string memberName, string parent) ResolveObjectChildren(string name, bool touchCode = true)
         {
-            // Return class of last child
-            string nm = name;
-            string par = "";
-            string chi = "";
-            bool pastPar = false;
-            bool pastFirst = false;
-            if (!name.Contains('.')) return (false, vars[name], name);
-            for (int i = 0; i < nm.Length; i++)
+            // Return if expression is a child of an object, parent's class, name of member and name of parent
+            try
             {
-                if (nm[i] != '.')
+                string nm = name;
+                string par = "";
+                string chi = "";
+                bool pastPar = false;
+                bool pastFirst = false;
+                if (!name.Contains('.')) return (false, GetVarType(name), name, name);
+                for (int i = 0; i < nm.Length; i++)
                 {
-                    if (!pastPar && !pastFirst) par += nm[i];
-                    else chi += nm[i];
-                }
-                if (nm[i] == '.' || i == nm.Length - 1)
-                {
-                    if(pastPar || i == nm.Length - 1)
+                    if (nm[i] != '.')
                     {
-                        string cl = vars[par];
-                        methcode[meth.Peek().Name].Add("spush " + classes[vars[par]].GetFieldIndex(chi));
-                        methcode[meth.Peek().Name].Add("push " + meth.Peek().Name + "!__father__");
-                        if (i < nm.Length - 1)
+                        if (!pastPar && !pastFirst) par += nm[i];
+                        else chi += nm[i];
+                    }
+                    if (nm[i] == '.' || i == nm.Length - 1)
+                    {
+                        if (pastPar || i == nm.Length - 1)
                         {
-                            methcode[meth.Peek().Name].Add("vai");
-                            methcode[meth.Peek().Name].Add("pop " + meth.Peek().Name + "!__father__");
-                            par = vars[par] + "!" + chi;
-                            chi = "";
-                            pastFirst = true;
+                            if (!classes[GetVarType(par)].Fields.ContainsKey(chi))
+                            {
+                                classes[GetVarType(par)].CreateField(chi);
+                            }
+                            if (touchCode)
+                            {
+                                methcode[meth.Peek().Name].Add("spush " + classes[GetVarType(par)].GetFieldIndex(chi));
+                                methcode[meth.Peek().Name].Add("push " + meth.Peek().Name + "!__father__");
+                            }
+                            if (i < nm.Length - 1)
+                            {
+                                if (touchCode)
+                                {
+                                    methcode[meth.Peek().Name].Add("vai");
+                                    methcode[meth.Peek().Name].Add("pop " + meth.Peek().Name + "!__father__");
+                                }
+                                par = GetVarType(par) + "!" + chi;
+                                chi = "";
+                                pastFirst = true;
+                            }
+                            else return (true, GetVarType(GetVarType(par) + "!" + chi), GetVarType(par) + "!" + chi, par);
                         }
-                        else return (true, vars[vars[par] + "!" + chi], vars[par] + "!" + chi);
+                        else if (!pastFirst)
+                        {
+                            if (touchCode) methcode[meth.Peek().Name].Add("mov " + par + " " + meth.Peek().Name + "!__father__");
+                        }
+                        pastPar = !pastPar;
                     }
-                    else if(!pastFirst)
-                    {
-                        methcode[meth.Peek().Name].Add("mov " + par + " " + meth.Peek().Name + "!__father__");
-                    }
-                    pastPar = !pastPar;
                 }
+                return (true, GetVarType(GetVarType(par) + "!" + chi), GetVarType(par) + "!" + chi, par);
             }
-            return (true, vars[vars[par] + "!" + chi], vars[par] + "!" + chi);
+            catch (Exception e)
+            {
+                Warning("Identifier not found: " + name);
+                return (false, "", "", "");
+            }
+        }
+        (bool isClassVar, string identifier) GetClassVar(string name)
+        {
+            // Returns if expression is class variable and its identifier
+            string[] exon = name.Split('.');
+            if (exon.Length == 1) return (false, name);
+            else
+            {
+                string trick = exon[0] + "!" + exon[1];
+                for (int i = 2; i < exon.Length; i++) trick += "." + exon[i];
+                return (true, trick);
+            }
         }
         string GetVarName(string var)
         {
+            // Returns actual variable name of identifier
             string nm = "";
             for (int i = 0; i < meth.Count; i++)
             {
@@ -434,6 +513,24 @@ namespace Whiplash
             }
             return nm;
         }
+        string GetVarNameDot(string var)
+        {
+            // Returns actual variable name of first parent object identifier followed by children unchanged
+            string[] dnf = var.Split('.');
+            if (dnf.Length > 1)
+            {
+                string trick = "." + dnf[1];
+                for (int i = 2; i < dnf.Length; i++) trick += "." + dnf[i];
+                return GetVarName(dnf[0]) + trick;
+            }
+            else return GetVarName(var);
+        }
+        string GetVarType(string var)
+        {
+            // Gets class of variable if there's one
+            if (!vars.ContainsKey(var)) vars.Add(var, "");
+            return vars[var];
+        }
         string GetMethRetType(string meth)
         {
             if (methRetTypes.ContainsKey(meth)) return methRetTypes[meth];
@@ -444,50 +541,47 @@ namespace Whiplash
             if (!methRetTypes.ContainsKey(meth)) methRetTypes.Add(meth, type);
             else methRetTypes[meth] = type;
         }
-        void Error(string err, int ln, string fil)
+        void Error(string err)
         {
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine("Error: " + err);
-            Console.WriteLine("At line " + ln + " of file " + fil);
+            Console.WriteLine("At line " + lineNumber + " of file " + currentFile);
             Console.ResetColor();
             Environment.Exit(-1);
+        }
+        void Warning(string war)
+        {
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("Warning: " + war);
+            Console.WriteLine("At line " + lineNumber + " of file " + currentFile);
+            Console.ResetColor();
         }
     }
     class ClassTemplate
     {
         public string TypeName { get; set; }
-        public Dictionary<string, int> Fields { get; set; }
+        public Dictionary<string, (int index, bool initialized)> Fields { get; set; }
         private int FieldIndex { get; set; }
         public ClassTemplate(string name)
         {
             TypeName = name;
-            Fields = new Dictionary<string, int>();
+            Fields = new Dictionary<string, (int, bool)>();
             FieldIndex = 0;
         }
         public void CreateField(string name)
         {
             if (!Fields.ContainsKey(name))
             {
-                Fields.Add(name, FieldIndex);
+                Fields.Add(name, (FieldIndex, false));
                 FieldIndex++;
             }
         }
-        public int GetFieldIndex(string name) => Fields[name];
-    }
-
-    class Variable
-    {
-        public string Name { get; set; }
-        public string Class { get; set; }
-        public Variable(string name)
+        public int GetFieldIndex(string name) => Fields[name].index;
+        public void SetInitialized(string name)
         {
-            Name = name;
-            Class = "";
-        }
-        public Variable(string name, string cl)
-        {
-            Name = name;
-            Class = cl;
+            (int, bool) ib = Fields[name];
+            ib.Item2 = true;
+            Fields[name] = ib;
         }
     }
 
