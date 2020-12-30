@@ -1,7 +1,7 @@
 import re
 import os.path as path
 import sys
-
+import os
 
 OP_NOP = 0x01
 OP_AND = 0x11
@@ -51,7 +51,7 @@ OP_VAR = 0x5B
 OP_VADE = 0x5C
 OP_VAP = 0x5D
 OP_VPF = 0x5E
-OP_VADI = 0x5F
+OP_SWAP = 0x5F
 OP_JMP = 0x60
 OP_JEQ = 0x61
 OP_JNE = 0x62
@@ -102,8 +102,9 @@ OP_HALT = 0xB0
 
 source = ""
 binary = ""
-include_path = "C:\\Neutrino\\ndk\\include\\"
-lib_path = "C:\\Neutrino\\ndk\\lib\\"
+base_dir = ""
+include_paths = []
+lib_paths = []
 includes = []
 pc = 0
 vi = 0
@@ -114,18 +115,26 @@ code = []
 pcode = []
 flags = []
 
-def include(file):
-    if file not in includes:
-        includes.append(file)
+def include(fil):
+    if fil not in includes:
+        includes.append(fil)
     c = []
-    if path.exists(file):
-        with open(file) as f:
-            c = f.readlines()
-    elif path.exists(include_path + file):
-        with open(include_path + file) as f:
+    if path.exists(os.path.join(base_dir, fil)):
+        with open(os.path.join(base_dir, fil)) as f:
             c = f.readlines()
     else:
-        rage_quit(1, "Cannot open included file: " + file)
+        done = False
+        for include_path in include_paths:
+            if path.exists(os.path.join(include_path, fil)):
+                with open(os.path.join(include_path, fil)) as f:
+                    c = f.readlines()
+                    done = True
+                    break
+        if not done:
+            rage_quit(1, "cannot open included file: " + fil)
+    for i in range(len(c)):
+        if c[i][len(c[i]) - 1] == '\n':
+            c[i] = s_remove(c[i], len(c[i]) - 1, 1);
     for line in c:
         if line.startswith("#include") and line.split(' ')[1] not in includes:
             includes.append(line.split(' ')[1])
@@ -272,7 +281,7 @@ def instr_var(op, var1):
 
 if len(sys.argv) == 2:
     if sys.argv[1] == "-help":
-        print("usage:\npython ntrasm.py <inputFile> [outputFile] [-options]\noptions:\n-genRelocTable: include symbol table in NEX header (for dynamic linking support)\n-genModuleFile: create linkable module descriptor file alongside main executable\n-silent: silent mode, does not write to stdout\n-verbose: show compilation line-by-line\nfor more info visit https://lorinet.github.io/neutrino/docs/ntrasm")
+        print("usage:\npython ntrasm.py <inputFile> [outputFile] [-options]\noptions:\n-genRelocTable: include symbol table in NEX header (for dynamic linking support)\n-genModuleFile: create linkable module descriptor file alongside main executable\n-silent: silent mode, does not write to stdout\n-verbose: show compilation line-by-line\n-includeDirectory=<dir>: add include directory\n-libraryDirectory=<dir>: add library directory\nfor more info visit https://lorinet.github.io/neutrino/docs/ntrasm")
         exit(-1)
     else:
         source = sys.argv[1]
@@ -299,7 +308,30 @@ else:
     print("python ntrasm.py -help for usage information")
     exit(-1)
 
+for f in flags:
+    if f.startswith("-includeDirectory="):
+        include_paths.append(f.split('=')[1])
+    elif f.startswith("-libraryDirectory="):
+        lib_paths.append(f.split('=')[1])
+
+if len(include_paths) == 0:
+    root = os.path.splitdrive(sys.executable)[0]
+    if root == "":
+        root = "/"
+    else:
+        root += "\\"
+    include_paths = [os.path.join(root, "neutrino", "ndk", "include")]
+
+if len(lib_paths) == 0:
+    root = os.path.splitdrive(sys.executable)[0]
+    if root == "":
+        root = "/"
+    else:
+        root += "\\"
+    lib_paths = [os.path.join(root, "neutrino", "ndk", "lib")]
+
 if path.exists(source):
+    base_dir = os.path.dirname(source)
     with open(source) as f:
         code = f.readlines()
 else:
@@ -321,33 +353,44 @@ includes.remove(source)
 
 for s in includes:
     included_code = []
-    if path.exists(s):
-        with open(s) as f:
-            included_code = f.readlines()
-    elif path.exists(include_path + s):
-        with open(include_path + s) as f:
+    if path.exists(os.path.join(base_dir, s)):
+        with open(os.path.join(base_dir, s)) as f:
             included_code = f.readlines()
     else:
-        rage_quit(1, "cannot open included file: " + s)
+        done = False
+        for include_path in include_paths:
+            if path.exists(os.path.join(include_path, s)):
+                with open(os.path.join(include_path, s)) as f:
+                    included_code = f.readlines()
+                    done = True
+                    break
+        if not done:
+            rage_quit(1, "cannot open included file: " + s)
+    for i in range(len(included_code)):
+        if included_code[i][len(included_code[i]) - 1] == '\n':
+            included_code[i] = s_remove(included_code[i], len(included_code[i]) - 1, 1);
+    code.extend(included_code)
 
-for i in range(len(code)):
+i = 0
+while i < len(code):
     if code[i].startswith("#include"):
         del code[i]
         i -= 1
+    i += 1
 
 for s in code:
     if s.startswith("#define"):
         name = s.split(' ')[1]
-        cnt = s.remove(0, 9 + len(name))
+        cnt = s_remove(s, 0, 9 + len(name))
         if name not in defines:
-            if cnt.startswith("\""):
-                cnt = s_remove(s_remove(cnt, 0, 1), len(cnt) - 1, 1)
-                defines[name] = cnt
+            defines[name] = cnt
 
-for i in range(len(code)):
+i = 0
+while i < len(code):
     if code[i].startswith("#define"):
         del code[i]
         i -= 1
+    i += 1
 
 for i in range(len(code)):
     for defn in defines:
@@ -370,11 +413,16 @@ for s in code:
         if path.exists(mdf):
             with open(mdf) as f:
                 mdl = f.readlines()
-        elif path.exists(lib_path + mdf):
-            with open(lib_path + mdf) as f:
-                mdl = f.readlines()
         else:
-            rage_quit(2, "cannot open linkable module descriptor for library " + mdf)
+            done = False
+            for lib_path in lib_paths:
+                if path.exists(os.path.join(lib_path, mdf)):
+                    with open(os.path.join(lib_path, mdf)) as f:
+                        mdl = f.readlines()
+                        done = True
+                        break
+            if not done:
+                rage_quit(2, "cannot open linkable module descriptor for library " + mdf)
         lnximports.append(s.split(' ')[1])
         mtds = {}
         for m in mdl:
@@ -404,13 +452,13 @@ for i in range(len(code)):
         oi = 0
         found = False
         for v in extmtds:
-            if sym in v[1]:
-                si = v[1][sym]
-                oi = v[0][1]
+            if sym in extmtds[v]:
+                si = extmtds[v][sym]
+                oi = v[1]
                 found = True
         if not found:
             rage_quit(3, "symbol not found: " + sym)
-        code[i] = "extmovl " + oi + " " + si + " " + lv
+        code[i] = "extmovl " + str(oi) + " " + str(si) + " " + str(lv)
 sections = {}
 sec = True
 for i in range(len(code)):
@@ -464,7 +512,8 @@ if "-cleanCode" in flags:
         f.writelines(executedCode)
 
 if "-genRelocTable" in flags:
-    print("creating symbol table...")
+    if "-silent" not in flags:
+        print("creating symbol table...")
     for s in code:
         if s.startswith("#exlink"):
             linkedSections.append(s.split(' ')[1])
@@ -481,7 +530,8 @@ if "-genRelocTable" in flags:
         for s in linkedSections:
             modl.append(s + ":" + str(lksi) + "\n")
             lksi += 1
-        print("writing module descriptor file [" + s_remove(binary, len(binary) - 4, 4) + ".lmd]")
+        if "-silent" not in flags:
+            print("writing module descriptor file [" + s_remove(binary, len(binary) - 4, 4) + ".lmd]")
         with open(s_remove(binary, len(binary) - 4, 4) + ".lmd", "w") as f:
             f.writelines(modl)
 else:
@@ -514,8 +564,8 @@ for s in executedCode:
             pcode.extend(to_bytes(var[arg[1]]))
         elif s[5 + len(arg[1])] == '"':
             val = ""
-            for i in range(6 + len(arg[1]), s.Length - 1):
-                if i == s.Length:
+            for i in range(6 + len(arg[1]), len(s) - 1):
+                if i == len(s):
                     val = s_remove(val, len(val) - 1, 1)
                     break
                 val += s[i]
@@ -555,7 +605,7 @@ for s in executedCode:
         if arg[1].replace(":", "") in labels:
             cr_var(arg[2])
             instr_simple(OP_MOVL)
-            pcode.extend(var[arg[2]])
+            pcode.extend(to_bytes(var[arg[2]]))
             pcode.extend(to_bytes(labels[arg[1].replace(":", "")]))
         else:
             rage_quit(9, "invalid label: " + arg[1])
@@ -572,42 +622,6 @@ for s in executedCode:
         instr_var_var_var(OP_INDEX, arg[1], arg[2], arg[3])
     elif op == "inst":
         instr_var_var_var(OP_INSERT, arg[1], arg[2], arg[3])
-    # elif op == "vac":
-    #     instr_var(OP_VAC, arg[1])
-    # elif op == "vad":
-    #     instr_var_var(OP_VAD, arg[1], arg[2])
-    # elif op == "vpf":
-    #     instr_var_var(OP_VPF, arg[1], arg[2])
-    # elif op == "vap":
-    #     instr_var_var(OP_VAP, arg[1], arg[2])
-    # elif op == "vade":
-    #     instr_var(OP_VADE, arg[1])
-    # elif op == "var":
-    #     instr_var_var(OP_VAR, arg[1], arg[2])
-    # elif op == "vai":
-    #     instr_var_var_var(OP_VAI, arg[1], arg[2], arg[3])
-    # elif op == "vadi":
-    #     cr_var(arg[1])
-    #     instr_simple(OP_VADI)
-    #     if s[6 + len(arg[1])] == '"':
-    #         val = ""
-    #         for i in range(7 + len(arg[1]), len(s) - 1):
-    #             if i == len(s.replace("\\0", "\0").replace("\\n", "\n")):
-    #                 val = s_remove(val, len(val) - 1, 1)
-    #                 break
-    #             val += s.replace("\\0", "\0").replace("\\n", "\n")[i]
-    #         pcode.extend(to_bytes(4 + len(val)))
-    #         pcode.extend(to_bytes(var[arg[1]]))
-    #         pcode.extend(s_to_bytes(val))
-    #     else:
-    #         value = int_lit(s, 6 + len(arg[1]))
-    #         pcode.extend(to_bytes(8))
-    #         pcode.extend(to_bytes(var[arg[1]]))
-    #         pcode.extend(to_bytes(value))
-    # elif op == "val":
-    #     instr_var_var(OP_VAL, arg[1], arg[2])
-    # elif op == "vas":
-    #     instr_var_var_var(OP_VAS, arg[1], arg[2], arg[3])
     elif op == "vac":
         instr_simple(OP_VAC)
     elif op == "vad":
@@ -622,8 +636,8 @@ for s in executedCode:
         instr_simple(OP_VAR)
     elif op == "vai":
         instr_simple(OP_VAI)
-    elif op == "vadi":
-        instr_simple(OP_VADI)
+    elif op == "swap":
+        instr_simple(OP_SWAP)
     elif op == "val":
         instr_simple(OP_VAL)
     elif op == "vas":
@@ -634,14 +648,6 @@ for s in executedCode:
         instr_byte_var_var(OP_APPEND, OP_APPENDB, arg[1], arg[2])
     elif op == "pushblk":
         instr_var_var_var(OP_PUSHBLK, arg[1], arg[2], arg[3])
-    # elif op == "add":
-    #     instr_var_var(OP_ADD, arg[1], arg[2])
-    # elif op == "sub":
-    #     instr_var_var(OP_SUB, arg[1], arg[2])
-    # elif op == "mul":
-    #     instr_var_var(OP_MUL, arg[1], arg[2])
-    # elif op == "div":
-    #     instr_var_var(OP_DIV, arg[1], arg[2])
     elif op == "add":
         instr_simple(OP_ADD)
     elif op == "sub":
@@ -749,7 +755,7 @@ for s in executedCode:
     elif op == "int" and len(arg) > 2:
         cr_var(arg[2])
         interrupt = int_lit(arg[1], 0)
-        vark = vars[arg[2]]
+        vark = var[arg[2]]
         if vark < 256:
             instr_simple(OP_INTB)
             pcode.append(to_byte(interrupt))
