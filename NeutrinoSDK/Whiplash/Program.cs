@@ -21,13 +21,13 @@ namespace Whiplash
         int lineNumber = 0;
         string currentFile = "";
         bool retp = false;
-        bool nextShouldInvokeClassConstructor = false;
         List<string> il = new List<string>();
         Dictionary<string, Regex> reg = new Dictionary<string, Regex>();
         Dictionary<string, Regex> textreg = new Dictionary<string, Regex>();
         Stack<Block> meth = new Stack<Block>();
-        Dictionary<string, ClassTemplate> classes = new Dictionary<string, ClassTemplate>();
-        Dictionary<string, string> vars = new Dictionary<string, string>();
+        List<string> vars = new List<string>();
+        List<string> classes = new List<string>();
+        List<string> names = new List<string>();
         Dictionary<string, List<string>> methcode = new Dictionary<string, List<string>>();
         Dictionary<string, string> methRetTypes = new Dictionary<string, string>();
         string importDirectories = Path.Combine(Path.GetPathRoot(Environment.SystemDirectory), "Neutrino\\ndk\\whiplash");
@@ -70,6 +70,7 @@ namespace Whiplash
             textreg.Add("name", new Regex("^\\s*(?!\\d)(\\w+)\\s*$"));
             methcode.Add("main", new List<string>());
             meth.Push(new Block("main", BlockType.Method));
+            LoadModule("whiprt.lmd");
             methcode["main"].Add("link whiprt.lnx");
             currentFile = infile;
             for (int i = 0; i < lines.Count; i++)
@@ -95,7 +96,7 @@ namespace Whiplash
                         if (meth.Peek().Type == BlockType.While)
                             methcode[meth.Peek().Name].Add("lj " + meth.Peek().Name);
                         else if (meth.Peek().Name.Split('!').Length == 2 && meth.Peek().Name.Split('!')[1] == "__init__")
-                            methcode[meth.Peek().Name].Add("push " + meth.Peek().Name + "!self");
+                            Push(meth.Peek().Name + "!self");
                         methcode[meth.Peek().Name].Add("ret");
                         meth.Pop();
                     }
@@ -104,9 +105,9 @@ namespace Whiplash
                 lineNumber = i;
                 ParseLine(lines[i]);
             }
-            foreach(KeyValuePair<string, ClassTemplate> ct in classes)
+            foreach (string ct in classes)
             {
-                methcode["main"].Insert(1, "call " + ct.Key);
+                methcode["main"].Insert(1, "call " + ct);
             }
             foreach (string k in methcode.Keys)
             {
@@ -114,9 +115,30 @@ namespace Whiplash
                 if (methcode[k].Count > 0 && !methcode[k][methcode[k].Count - 1].Trim().StartsWith("ret")) methcode[k].Add("ret");
                 il.AddRange(methcode[k]);
             }
+            ReplaceNamesWithNumbers();
             File.WriteAllLines(outfile, il.ToArray());
             // Only for testing
             Process.Start("python", "C:\\Neutrino\\ndk\\ntrasm.py " + outfile + " C:\\Neutrino\\bin\\" + outfile.Replace(".ns", ".lex"));
+        }
+        void LoadModule(string lmod)
+        {
+            string modf = lmod;
+            if (!File.Exists(modf))
+            {
+                modf = Path.Combine(Path.GetPathRoot(Environment.SystemDirectory), "Neutrino", "ndk", "lib", modf);
+            }
+            if (!File.Exists(modf))
+            {
+                Error("Cannot open library module: " + lmod);
+            }
+            string[] modc = File.ReadAllLines(modf);
+            foreach (string s in modc)
+            {
+                if (s.Trim() != "")
+                {
+                    methRetTypes.Add(s.Split(':')[0], "");
+                }
+            }
         }
         Token ParseLine(string s)
         {
@@ -157,34 +179,37 @@ namespace Whiplash
                             methcode.Remove(meth.Peek().Name);
                             meth.Peek().Name = meth.ToArray()[1].Name + "!__init__";
                             methcode.Add(meth.Peek().Name, new List<string>());
-                            vars.Add(meth.Peek().Name + "!self", meth.ToArray()[1].Name);
                             cargs.RemoveAt(0);
-                            SetMethRetType(meth.Peek().Name, meth.ToArray()[1].Name);
                         }
                         else if (isMember)
                         {
                             methcode.Remove(meth.Peek().Name);
                             meth.Peek().Name = meth.ToArray()[1].Name + "!" + meth.Peek().Name;
                             methcode.Add(meth.Peek().Name, new List<string>());
-                            vars.Add(meth.Peek().Name + "!self", meth.ToArray()[1].Name);
-                            classes[meth.ToArray()[1].Name].Members.Add(m.Groups[1].ToString(), (-1, true));
-                            vars.Add(meth.Peek().Name, "");
+                            vars.Add(meth.Peek().Name + "!self");
+                            vars.Add(meth.Peek().Name);
                             // put self at the end so that we can push self automatically
                             cargs.Add(cargs[0]);
                             cargs.RemoveAt(0);
+                            methcode[meth.ToArray()[1].Name + "!__init__"].Insert(2, "pushl " + meth.Peek().Name);
+                            methcode[meth.ToArray()[1].Name + "!__init__"].Insert(3, "push " + meth.ToArray()[1].Name + "!__init__!self");
+                            methcode[meth.ToArray()[1].Name + "!__init__"].Insert(4, "spush %" + m.Groups[1].ToString() + "%");
+                            methcode[meth.ToArray()[1].Name + "!__init__"].Insert(5, "stfld");
+
                         }
+                        names.Add(m.Groups[1].ToString());
                         for (int ax = cargs.Count - 1; ax >= 0; ax--)
                         {
                             if (cargs[ax].Trim() != "")
                             {
-                                methcode[meth.Peek().Name].Add("pop " + meth.Peek() + "!" + cargs[ax]);
-                                if (!vars.ContainsKey(meth.Peek().Name + "!" + cargs[ax])) vars.Add(meth.Peek() + "!" + cargs[ax], "");
+                                Pop(meth.Peek() + "!" + cargs[ax]);
+                                if (!vars.Contains(meth.Peek().Name + "!" + cargs[ax])) vars.Add(meth.Peek() + "!" + cargs[ax]);
                             }
                         }
                         if (m.Groups[1].ToString() == "__init__" && isMember)
                         {
-                            methcode[meth.Peek().Name].Add("vac");
-                            methcode[meth.Peek().Name].Add("pop " + meth.Peek().Name + "!self");
+                            Newobj();
+                            Pop(meth.Peek().Name + "!self");
                         }
                     }
                     else if (g == "class")
@@ -192,14 +217,14 @@ namespace Whiplash
                         if (methcode.ContainsKey(m.Groups[1].ToString())) Error("Redefinition of " + m.Groups[1].ToString());
                         meth.Push(new Block(m.Groups[1].ToString(), BlockType.Class));
                         methcode.Add(m.Groups[1].ToString(), new List<string>());
-                        classes.Add(meth.Peek().Name, new ClassTemplate(meth.Peek().Name));
+                        classes.Add(meth.Peek().Name);
                     }
                     else if (g == "inline_il")
                         methcode[meth.Peek().Name].Add(m.Groups[1].ToString());
                     else if (g == "if")
                     {
                         nm = meth.Peek().Name + "!&!cond";
-                        if (!vars.ContainsKey(nm)) vars.Add(nm, "");
+                        if (!vars.Contains(nm)) vars.Add(nm);
                         nm = "_if_" + meth.Peek().Name + "@" + meth.Peek().IfCount.ToString();
                         ProcessStatement("&!cond = " + m.Groups[1].ToString());
                         methcode[meth.Peek().Name].Add("mov " + meth.Peek().Name + "!&!cond " + meth.Peek().Name + "!&!orig_cond");
@@ -212,7 +237,7 @@ namespace Whiplash
                     else if (g == "elif")
                     {
                         nm = meth.Peek().Name + "!&!cond";
-                        if (!vars.ContainsKey(nm)) vars.Add(nm, "");
+                        if (!vars.Contains(nm)) vars.Add(nm);
                         nm = "_elif_" + meth.Peek().Name + "@" + meth.Peek().IfCount.ToString();
                         ProcessStatement("&!cond = !&!orig_cond && " + m.Groups[1].ToString());
                         methcode[meth.Peek().Name].Add("cmpi " + meth.Peek().Name + "!&!cond 1");
@@ -234,7 +259,7 @@ namespace Whiplash
                     else if (g == "while")
                     {
                         nm = meth.Peek().Name + "!&!cond";
-                        if (!vars.ContainsKey(nm)) vars.Add(nm, "");
+                        if (!vars.Contains(nm)) vars.Add(nm);
                         nm = "_while_" + meth.Peek().Name + "@" + meth.Peek().WhileCount.ToString();
                         methcode[meth.Peek().Name].Add("jmp " + nm);
                         meth.Peek().WhileCount += 1;
@@ -258,19 +283,7 @@ namespace Whiplash
                     }
                     else if (g == "return_val")
                     {
-                        tkr = ParseLine(m.Groups[1].ToString());
-                        if (tkr != null)
-                        {
-                            if (tkr.Type == TokenType.Literal)
-                            {
-                                methcode[meth.Peek().Name].Add("spush " + tkr.Text);
-                            }
-                            else if (tkr.Type == TokenType.Name)
-                            {
-                                methcode[meth.Peek().Name].Add("push " + GetVarName(tkr.Name));
-                                SetMethRetType(meth.Peek().Name, ResolveObjectChildren(GetVarName(tkr.Name)).classType);
-                            }
-                        }
+                        ProcessStatement(m.Groups[1].ToString());
                         if (meth.Peek().Type == BlockType.Method)
                         {
                             methcode[meth.Peek().Name].Add("ret");
@@ -282,14 +295,13 @@ namespace Whiplash
                     else if (g == "assign_var_var")
                     {
                         // Resolve children!
-                        (bool isMember, string classType, string memberName, string parent) cr = ResolveObjectChildren(GetVarName(m.Groups[2].ToString()));
-                        if (cr.isMember) methcode[meth.Peek().Name].Add("vai");
-                        else methcode[meth.Peek().Name].Add("push " + GetVarName(m.Groups[2].ToString()));
-                        if (ResolveObjectChildren(GetVarName(m.Groups[1].ToString())).isMember) methcode[meth.Peek().Name].Add("vas");
+                        (bool isMember, string parent) cr = ResolveObjectChildren(GetVarName(m.Groups[2].ToString()));
+                        if (cr.isMember) LoadField();
+                        else Push(GetVarName(m.Groups[2].ToString()));
+                        if (ResolveObjectChildren(GetVarName(m.Groups[1].ToString())).isMember) StoreField();
                         else
                         {
-                            methcode[meth.Peek().Name].Add("pop " + GetVarName(m.Groups[1].ToString()));
-                            vars[GetVarName(m.Groups[1].ToString())] = cr.classType;
+                            Pop(GetVarName(m.Groups[1].ToString()));
                         }
                     }
                     else if (g == "assign_var_call" || g == "method_call") ProcessStatement(lin);
@@ -309,6 +321,39 @@ namespace Whiplash
             }
             return tk;
         }
+        void Spush(object val)
+        {
+            methcode[meth.Peek().Name].Add("spush " + val.ToString());
+        }
+        void Push(string var)
+        {
+            methcode[meth.Peek().Name].Add("push " + var);
+        }
+        void Pop(string var)
+        {
+            methcode[meth.Peek().Name].Add("pop " + var);
+        }
+        void Call(string ehu)
+        {
+            methcode[meth.Peek().Name].Add("extcall " + ehu);
+        }
+        void Mov(string var1, string var2)
+        {
+            methcode[meth.Peek().Name].Add("mov " + var1 + " " + var2);
+            if (!vars.Contains(var2)) vars.Add(var2);
+        }
+        void LoadField()
+        {
+            methcode[meth.Peek().Name].Add("ldfld");
+        }
+        void StoreField()
+        {
+            methcode[meth.Peek().Name].Add("stfld");
+        }
+        void Newobj()
+        {
+            methcode[meth.Peek().Name].Add("newobj");
+        }
         void ProcessStatement(string stmt)
         {
             for (int j = 0; j < stmt.Length; j++)
@@ -322,7 +367,7 @@ namespace Whiplash
                 Token tkr = tk;
                 int lev = 0;
                 string prevCall = "";
-                (bool isMember, string classType, string memberName, string parent) re;
+                (bool isMember, string parent) re;
                 (bool isClassVar, string identifier) cv;
                 while (true)
                 {
@@ -333,32 +378,25 @@ namespace Whiplash
                     }
                     else
                     {
-                        if (lev == 0) break;
+                        if (lev == 0 && Regex.Split(stmt, "\\b\\w+\\b").Length > 2) break;
+                        else if (lev == -1) break;
                         lev--;
                         if (tkr.Tokens.Count == 0)
                         {
                             if (tkr.Type == TokenType.Name)
                             {
                                 re = ResolveObjectChildren(GetVarNameDot(tkr.Name));
-                                if (re.isMember)
-                                {
-                                    methcode[meth.Peek().Name].Add("vai");
-                                }
+                                if (re.isMember) LoadField();
                                 else
                                 {
                                     cv = GetClassVar(tkr.Name);
-                                    if(cv.isClassVar)
-                                    {
-                                        methcode[meth.Peek().Name].Add("push " + cv.identifier);
-                                    }
-                                    else methcode[meth.Peek().Name].Add("push " + GetVarName(tkr.Name));
+                                    if (cv.isClassVar)
+                                        Push(cv.identifier);
+                                    else Push(GetVarName(tkr.Name));
                                 }
                             }
-                            else if (tkr.Type == TokenType.Literal)
-                            {
-                                methcode[meth.Peek().Name].Add("spush " + tkr.Text);
-                            }
-                            if (tkr.Negate) methcode[meth.Peek().Name].Add("extcall &__not_func");
+                            else if (tkr.Type == TokenType.Literal) Spush(tkr.Text);
+                            if (tkr.Negate) Call("&__not_func");
                         }
                         tkr = Token.Node(ref tk, lev);
                         tkr.ChildIndex++;
@@ -375,57 +413,40 @@ namespace Whiplash
                                     re = ResolveObjectChildren(GetVarNameDot(tkr.Name), false);
                                     if (re.isMember)
                                     {
+                                        Push(re.parent);
                                         ResolveObjectChildren(GetVarNameDot(tkr.Name));
-                                        methcode[meth.Peek().Name].RemoveAt(methcode[meth.Peek().Name].Count - 2);
-                                        methcode[meth.Peek().Name].Add("extcall " + re.memberName);
+                                        LoadField();
+                                        methcode[meth.Peek().Name].Add("jsp");
                                     }
-                                    else if (classes.ContainsKey(tkr.Name)) methcode[meth.Peek().Name].Add("extcall " + tkr.Name + "!__init__");
-                                    else methcode[meth.Peek().Name].Add("extcall " + tkr.Name);
+                                    else if (classes.Contains(tkr.Name)) Call(tkr.Name + "!__init__");
+                                    else 
+                                        Call(tkr.Name);
                                 }
-                                if (tkr.Negate) methcode[meth.Peek().Name].Add("extcall &__not_func");
+                                if (tkr.Negate) Call("&__not_func");
                             }
                             else if (tkr.Type == TokenType.Assignment)
                             {
-                                if (tkr.Negate) methcode[meth.Peek().Name].Add("extcall &__not_func");
+                                if (tkr.Negate) Call("&__not_func");
                                 prevCall = methcode[meth.Peek().Name][methcode[meth.Peek().Name].Count - 1];
-                                if (prevCall.StartsWith("extcall"))
-                                {
-                                    if(classes.ContainsKey(prevCall.Split(' ')[1].Split('!')[0]))
-                                    {
-                                        vars[GetVarName(tkr.Name)] = prevCall.Split(' ')[1].Split('!')[0];
-                                    }
-                                }
                                 if (tkr.AssignmentOperator != "=")
                                 {
                                     re = ResolveObjectChildren(GetVarNameDot(tkr.Name));
-                                    if (re.isMember) methcode[meth.Peek().Name].Add("vai");
-                                    else methcode[meth.Peek().Name].Add("push " + GetVarName(tkr.Name));
+                                    if (re.isMember) LoadField();
+                                    else Push(GetVarName(tkr.Name));
                                     methcode[meth.Peek().Name].Add("swap");
                                     if (tkr.AssignmentOperator.Length == 3) methcode[meth.Peek().Name].Add(tkr.AssignmentOperator);
-                                    else methcode[meth.Peek().Name].Add("extcall " + tkr.AssignmentOperator);
+                                    else Call(tkr.AssignmentOperator);
                                 }
                                 re = ResolveObjectChildren(GetVarNameDot(tkr.Name));
-                                if (re.isMember)
-                                {
-                                    if (!classes[GetVarType(re.parent)].Members[re.memberName.Split('!')[1]].initialized)
-                                    {
-                                        classes[GetVarType(re.parent)].SetInitialized(re.memberName.Split('!')[1]);
-                                        methcode[meth.Peek().Name].RemoveAt(methcode[meth.Peek().Name].Count - 2);
-                                        methcode[meth.Peek().Name].Add("vad");
-                                    }
-                                    else methcode[meth.Peek().Name].Add("vas");
-                                }
-                                else
-                                {
-                                    methcode[meth.Peek().Name].Add("pop " + GetVarName(tkr.Name));
-                                }
+                                if (re.isMember) StoreField();
+                                else Pop(GetVarName(tkr.Name));
                             }
                         }
                     }
                 }
             }
         }
-        (bool isMember, string classType, string memberName, string parent) ResolveObjectChildren(string name, bool touchCode = true)
+        (bool isMember, string parent) ResolveObjectChildren(string name, bool touchCode = true)
         {
             // Return if expression is a child of an object, parent's class, name of member and name of parent
             try
@@ -435,7 +456,7 @@ namespace Whiplash
                 string chi = "";
                 bool pastPar = false;
                 bool pastFirst = false;
-                if (!name.Contains('.')) return (false, GetVarType(name), name, name);
+                if (!name.Contains('.')) return (false, name);
                 for (int i = 0; i < nm.Length; i++)
                 {
                     if (nm[i] != '.')
@@ -447,41 +468,36 @@ namespace Whiplash
                     {
                         if (pastPar || i == nm.Length - 1)
                         {
-                            if (!classes[GetVarType(par)].Members.ContainsKey(chi))
-                            {
-                                classes[GetVarType(par)].CreateField(chi);
-                            }
+                            if (!names.Contains(chi)) names.Add(chi);
                             if (touchCode)
                             {
-                                methcode[meth.Peek().Name].Add("spush " + classes[GetVarType(par)].GetFieldIndex(chi));
-                                methcode[meth.Peek().Name].Add("push " + meth.Peek().Name + "!__father__");
+                                Spush("%" + chi + "%");
                             }
                             if (i < nm.Length - 1)
                             {
                                 if (touchCode)
                                 {
-                                    methcode[meth.Peek().Name].Add("vai");
-                                    methcode[meth.Peek().Name].Add("pop " + meth.Peek().Name + "!__father__");
+                                    LoadField();
                                 }
-                                par = GetVarType(par) + "!" + chi;
+                                par = chi;
                                 chi = "";
                                 pastFirst = true;
                             }
-                            else return (true, GetVarType(GetVarType(par) + "!" + chi), GetVarType(par) + "!" + chi, par);
+                            else return (true, par);
                         }
                         else if (!pastFirst)
                         {
-                            if (touchCode) methcode[meth.Peek().Name].Add("mov " + par + " " + meth.Peek().Name + "!__father__");
+                            if (touchCode) Push(par);
                         }
                         pastPar = !pastPar;
                     }
                 }
-                return (true, GetVarType(GetVarType(par) + "!" + chi), GetVarType(par) + "!" + chi, par);
+                return (true, par);
             }
-            catch (Exception e)
+            catch
             {
                 Warning("Identifier not found: " + name);
-                return (false, "", "", "");
+                return (false, "");
             }
         }
         (bool isClassVar, string identifier) GetClassVar(string name)
@@ -503,13 +519,13 @@ namespace Whiplash
             for (int i = 0; i < meth.Count; i++)
             {
                 nm = meth.ToArray()[i] + "!" + var;
-                if (vars.ContainsKey(nm)) break;
+                if (vars.Contains(nm)) break;
                 else nm = "";
             }
             if (nm == "")
             {
                 nm = meth.Peek() + "!" + var;
-                vars.Add(nm, "");
+                vars.Add(nm);
             }
             return nm;
         }
@@ -525,22 +541,18 @@ namespace Whiplash
             }
             else return GetVarName(var);
         }
-        string GetVarType(string var)
+
+        void ReplaceNamesWithNumbers()
         {
-            // Gets class of variable if there's one
-            if (!vars.ContainsKey(var)) vars.Add(var, "");
-            return vars[var];
+            for(int i = 0; i < il.Count; i++)
+            {
+                for(int j = 0; j < names.Count; j++)
+                {
+                    il[i] = il[i].ReplaceName(names[j], j.ToString());
+                }
+            }
         }
-        string GetMethRetType(string meth)
-        {
-            if (methRetTypes.ContainsKey(meth)) return methRetTypes[meth];
-            return "";
-        }
-        void SetMethRetType(string meth, string type)
-        {
-            if (!methRetTypes.ContainsKey(meth)) methRetTypes.Add(meth, type);
-            else methRetTypes[meth] = type;
-        }
+
         void Error(string err)
         {
             Console.ForegroundColor = ConsoleColor.Red;
@@ -555,33 +567,6 @@ namespace Whiplash
             Console.WriteLine("Warning: " + war);
             Console.WriteLine("At line " + lineNumber + " of file " + currentFile);
             Console.ResetColor();
-        }
-    }
-    class ClassTemplate
-    {
-        public string TypeName { get; set; }
-        public Dictionary<string, (int index, bool initialized)> Members { get; set; }
-        private int FieldIndex { get; set; }
-        public ClassTemplate(string name)
-        {
-            TypeName = name;
-            Members = new Dictionary<string, (int, bool)>();
-            FieldIndex = 0;
-        }
-        public void CreateField(string name)
-        {
-            if (!Members.ContainsKey(name))
-            {
-                Members.Add(name, (FieldIndex, false));
-                FieldIndex++;
-            }
-        }
-        public int GetFieldIndex(string name) => Members[name].index;
-        public void SetInitialized(string name)
-        {
-            (int, bool) ib = Members[name];
-            ib.Item2 = true;
-            Members[name] = ib;
         }
     }
 
@@ -857,7 +842,7 @@ namespace Whiplash
             {
                 Negate = true;
                 Name = Name.Remove(0, 1);
-                
+
             }
             for (int j = 0; j < Text.Length; j++)
             {
@@ -902,6 +887,11 @@ namespace Whiplash
         {
             if (s == "") return "";
             return Regex.Replace(s, "\\b" + Regex.Escape(from) + "\\s\\b", to);
+        }
+        public static string ReplaceName(this string s, string from, string to)
+        {
+            if (s == "") return "";
+            return Regex.Replace(s, "%" + Regex.Escape(from) + "%", to);
         }
     }
 }
