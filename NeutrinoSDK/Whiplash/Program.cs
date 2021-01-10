@@ -108,6 +108,7 @@ namespace Whiplash
             foreach (string ct in classes)
             {
                 methcode["main"].Insert(1, "call " + ct);
+                methcode["main"].Insert(1, "pop " + ct + "__globals");
             }
             foreach (string k in methcode.Keys)
             {
@@ -178,8 +179,19 @@ namespace Whiplash
                         {
                             methcode.Remove(meth.Peek().Name);
                             meth.Peek().Name = meth.ToArray()[1].Name + "!__init__";
-                            methcode.Add(meth.Peek().Name, new List<string>());
+                            bool ctorAlrdReqd = methcode.ContainsKey(meth.Peek().Name);
                             cargs.RemoveAt(0);
+                            if (ctorAlrdReqd)
+                            {
+                                methcode[meth.Peek().Name].Insert(0, "pop " + meth.Peek().Name + "!self");
+                                methcode[meth.Peek().Name].Insert(0, "newobj");
+                            }
+                            else
+                            {
+                                methcode.Add(meth.Peek().Name, new List<string>());
+                                Newobj();
+                                Pop(meth.Peek().Name + "!self");
+                            }
                         }
                         else if (isMember)
                         {
@@ -188,9 +200,7 @@ namespace Whiplash
                             methcode.Add(meth.Peek().Name, new List<string>());
                             vars.Add(meth.Peek().Name + "!self");
                             vars.Add(meth.Peek().Name);
-                            // put self at the end so that we can push self automatically
-                            cargs.Add(cargs[0]);
-                            cargs.RemoveAt(0);
+                            if (!methcode.ContainsKey(meth.ToArray()[1].Name + "!__init__")) methcode.Add(meth.ToArray()[1].Name + "!__init__", new List<string>());
                             methcode[meth.ToArray()[1].Name + "!__init__"].Insert(2, "pushl " + meth.Peek().Name);
                             methcode[meth.ToArray()[1].Name + "!__init__"].Insert(3, "push " + meth.ToArray()[1].Name + "!__init__!self");
                             methcode[meth.ToArray()[1].Name + "!__init__"].Insert(4, "spush %" + m.Groups[1].ToString() + "%");
@@ -206,17 +216,14 @@ namespace Whiplash
                                 if (!vars.Contains(meth.Peek().Name + "!" + cargs[ax])) vars.Add(meth.Peek() + "!" + cargs[ax]);
                             }
                         }
-                        if (m.Groups[1].ToString() == "__init__" && isMember)
-                        {
-                            Newobj();
-                            Pop(meth.Peek().Name + "!self");
-                        }
                     }
                     else if (g == "class")
                     {
                         if (methcode.ContainsKey(m.Groups[1].ToString())) Error("Redefinition of " + m.Groups[1].ToString());
                         meth.Push(new Block(m.Groups[1].ToString(), BlockType.Class));
                         methcode.Add(m.Groups[1].ToString(), new List<string>());
+                        methcode[meth.Peek().Name].Add("newobj");
+                        Pop(meth.Peek().Name + "__globals");
                         classes.Add(meth.Peek().Name);
                     }
                     else if (g == "inline_il")
@@ -297,6 +304,8 @@ namespace Whiplash
                         // Resolve children!
                         (bool isMember, string parent) cr = ResolveObjectChildren(GetVarName(m.Groups[2].ToString()));
                         if (cr.isMember) LoadField();
+                        else if (m.Groups[2].ToString().Trim() == "True") Spush("1");
+                        else if (m.Groups[2].ToString().Trim() == "False") Spush("0");
                         else Push(GetVarName(m.Groups[2].ToString()));
                         if (ResolveObjectChildren(GetVarName(m.Groups[1].ToString())).isMember) StoreField();
                         else
@@ -373,6 +382,18 @@ namespace Whiplash
                 {
                     if (tkr.ChildIndex < tkr.Tokens.Count)
                     {
+                        if(tkr.ChildIndex == 0)
+                        {
+                            if(tkr.Type == TokenType.MethodCall)
+                            {
+                                re = ResolveObjectChildren(GetVarNameDot(tkr.Name), false);
+                                if(re.isMember)
+                                {
+                                    if (ResolveObjectChildren(GetVarNameDot(tkr.Name)).isMember) methcode[meth.Peek().Name].RemoveAt(methcode[meth.Peek().Name].Count - 1);
+                                    else Push(re.parent);
+                                }
+                            }
+                        }
                         lev++;
                         tkr = tkr.Tokens[tkr.ChildIndex];
                     }
@@ -392,6 +413,8 @@ namespace Whiplash
                                     cv = GetClassVar(tkr.Name);
                                     if (cv.isClassVar)
                                         Push(cv.identifier);
+                                    else if (methcode.ContainsKey(tkr.Name))
+                                        methcode[meth.Peek().Name].Add("pushl " + tkr.Name);
                                     else Push(GetVarName(tkr.Name));
                                 }
                             }
@@ -404,22 +427,20 @@ namespace Whiplash
                         {
                             if (tkr.Type == TokenType.MethodCall)
                             {
-                                // FIXME: This is a hack. Really you shouldn't check for arithmetic operations
-                                //        based on initial character. Beginner programmers forget about invalid
-                                //        python characters in identifiers and then complain about random errors.
                                 if (tkr.Name[0] == '~') methcode[meth.Peek().Name].Add(tkr.Name.Remove(0, 1));
+                                else if (tkr.Name == "str") methcode[meth.Peek().Name].Add("tostr");
+                                else if (tkr.Name == "int") methcode[meth.Peek().Name].Add("integer");
                                 else
                                 {
                                     re = ResolveObjectChildren(GetVarNameDot(tkr.Name), false);
                                     if (re.isMember)
                                     {
-                                        Push(re.parent);
                                         ResolveObjectChildren(GetVarNameDot(tkr.Name));
                                         LoadField();
                                         methcode[meth.Peek().Name].Add("jsp");
                                     }
                                     else if (classes.Contains(tkr.Name)) Call(tkr.Name + "!__init__");
-                                    else 
+                                    else
                                         Call(tkr.Name);
                                 }
                                 if (tkr.Negate) Call("&__not_func");
@@ -439,6 +460,12 @@ namespace Whiplash
                                 }
                                 re = ResolveObjectChildren(GetVarNameDot(tkr.Name));
                                 if (re.isMember) StoreField();
+                                else if(classes.Contains(meth.Peek().Name))
+                                {
+                                    Push(meth.Peek().Name + "__globals");
+                                    Spush("%" + tkr.Name + "%");
+                                    StoreField();
+                                }    
                                 else Pop(GetVarName(tkr.Name));
                             }
                         }
@@ -481,7 +508,7 @@ namespace Whiplash
                                 }
                                 par = chi;
                                 chi = "";
-                                pastFirst = true;
+                                if (!pastFirst) pastFirst = true;
                             }
                             else return (true, par);
                         }
@@ -515,6 +542,7 @@ namespace Whiplash
         string GetVarName(string var)
         {
             // Returns actual variable name of identifier
+            if (classes.Contains(var)) return var + "__globals";
             string nm = "";
             for (int i = 0; i < meth.Count; i++)
             {
@@ -576,6 +604,7 @@ namespace Whiplash
         public BlockType Type { get; set; }
         public Token Condition { get; set; }
         public int IfCount { get; set; }
+        public int ParamsCount { get; set; }
         public int WhileCount { get; set; }
         public Block(string name, BlockType type)
         {
@@ -583,6 +612,7 @@ namespace Whiplash
             Type = type;
             IfCount = 0;
             WhileCount = 0;
+            ParamsCount = 0;
         }
         public Block(string name, BlockType type, Token cond)
         {
@@ -591,6 +621,7 @@ namespace Whiplash
             IfCount = 0;
             WhileCount = 0;
             Condition = cond;
+            ParamsCount = 0;
         }
         public override string ToString()
         {
@@ -621,6 +652,7 @@ namespace Whiplash
         public string Text { get; set; }
         public int ChildIndex { get; set; }
         public bool Negate { get; set; }
+        public bool SelfLoaded { get; set; }
         public TokenType Type { get; set; }
         public string AssignmentOperator { get; set; }
         public Token()
@@ -791,7 +823,7 @@ namespace Whiplash
                         bound = bound.Remove(bound.Length - 1);
                     }
                     else if (bound.Length == 0) cp = false;
-                    if (bound.Length == 0 && (Text[i] == ',' || (!cp && Text[i] == ')')))
+                    if (bound.Length == 0 && ((Text[i] == ',' && (bound.Length == 0 || bound[bound.Length - 1] != '"')) || (!cp && Text[i] == ')')))
                     {
                         if (ct[ct.Length - 1] == ',' || (!cp && ct[ct.Length - 1] == ')')) ct = ct.Remove(ct.Length - 1);
                         for (int j = 0; j < ct.Length; j++)
@@ -836,7 +868,9 @@ namespace Whiplash
                     else name += Text[i];
                 }
             }
-            if (Type == TokenType.Name && (Text.StartsWith("\"") || Text.Trim().StartsWith("0x") || int.TryParse(Text.Trim().Replace("!", ""), out n))) Type = TokenType.Literal;
+            if (Type == TokenType.Name && (Text.StartsWith("\"") || Text.Trim().StartsWith("0x") || int.TryParse(Text.Trim().Replace("!", ""), out n) || Text.Trim() == "True" || Text.Trim() == "False")) Type = TokenType.Literal;
+            if (Text.Trim() == "True") Text = "1";
+            else if (Text.Trim() == "False") Text = "0";
             if (Name == "") Name = name.Trim();
             if (Name.StartsWith("!"))
             {

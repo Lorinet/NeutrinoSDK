@@ -16,7 +16,7 @@ OP_TOSTR = 0x21
 OP_CLR = 0x22
 OP_MOV = 0x23
 OP_CONCAT = 0x24
-OP_PARSE = 0x25
+OP_PARSEINT = 0x25
 OP_SPLIT = 0x26
 OP_INDEX = 0x27
 OP_SIZE = 0x28
@@ -593,7 +593,7 @@ for s in executedCode:
         value = int_lit(s, 6)
         pcode.append(to_byte(value))
     elif op == "string" or op == "tostr":
-        instr_var_var(OP_TOSTR, arg[1], arg[2])
+        instr_simple(OP_TOSTR)
     elif op == "clr":
         cr_var(arg[1])
         vkey = var[arg[1]]
@@ -619,7 +619,7 @@ for s in executedCode:
     elif op == "concat":
         instr_byte_var_var(OP_CONCAT, OP_CONCATB, arg[1], arg[2])
     elif op == "integer":
-        instr_var_var(OP_PARSE, arg[1], arg[2])
+        instr_simple(OP_PARSEINT)
     elif op == "index":
         instr_var_var_var(OP_INDEX, arg[1], arg[2], arg[3])
     elif op == "inst":

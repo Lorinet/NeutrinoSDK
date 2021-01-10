@@ -2,3 +2,4 @@ bin
 obj
 .vs
 NeutrinoSDK/.vs/
+NeutrinoSDK/PythonNDK/.vscode/
