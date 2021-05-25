@@ -89,9 +89,9 @@ namespace Whiplash
                     }
                     tab = ind.Split("    ").Length - 1;
                 }
-                if (prevTab > tab && !retp)
+                if (prevTab > tab)
                 {
-                    for (int id = 0; id < prevTab - tab; id++)
+                    for (int id = (!retp ? 0 : 1); id < prevTab - tab; id++)
                     {
                         if (meth.Peek().Type == BlockType.While)
                             methcode[meth.Peek().Name].Add("lj " + meth.Peek().Name);
@@ -101,6 +101,15 @@ namespace Whiplash
                         meth.Pop();
                     }
                 }
+                else if (prevTab == tab && ln.Trim().StartsWith("def"))
+                {
+                    if (meth.Peek().Type == BlockType.While)
+                        methcode[meth.Peek().Name].Add("lj " + meth.Peek().Name);
+                    else if (meth.Peek().Name.Split('!').Length == 2 && meth.Peek().Name.Split('!')[1] == "__init__")
+                        Push(meth.Peek().Name + "!self");
+                    methcode[meth.Peek().Name].Add("ret");
+                    meth.Pop();
+                }
                 else if (retp) retp = false;
                 lineNumber = i;
                 ParseLine(lines[i]);
@@ -108,7 +117,6 @@ namespace Whiplash
             foreach (string ct in classes)
             {
                 methcode["main"].Insert(1, "call " + ct);
-                methcode["main"].Insert(1, "pop " + ct + "__globals");
             }
             foreach (string k in methcode.Keys)
             {
@@ -344,7 +352,7 @@ namespace Whiplash
         }
         void Call(string ehu)
         {
-            methcode[meth.Peek().Name].Add("extcall " + ehu);
+            methcode[meth.Peek().Name].Add("leap " + ehu);
         }
         void Mov(string var1, string var2)
         {
@@ -439,7 +447,8 @@ namespace Whiplash
                                         LoadField();
                                         methcode[meth.Peek().Name].Add("jsp");
                                     }
-                                    else if (classes.Contains(tkr.Name)) Call(tkr.Name + "!__init__");
+                                    else if (classes.Contains(tkr.Name))
+                                        Call(tkr.Name + "!__init__");
                                     else
                                         Call(tkr.Name);
                                 }
@@ -690,7 +699,11 @@ namespace Whiplash
                     else if (Text[k] == ')')
                     {
                         bound = bound.Remove(bound.Length - 1);
-                        if (bound == "") break;
+                        if (bound == "")
+                        {
+                            if (k < Text.Length - 1 && Text[k + 1] == '.') ;
+                            else break;
+                        }
                     }
                     else if (bound == "" && (Text[k] == ' ' || Text[k] == '=' || Text[k] == '<' || Text[k] == '>' || Text[k] == '+' || Text[k] == '-' || Text[k] == '*' || Text[k] == '/' || Text[k] == '%' || Text[k] == '\x01' || Text[k] == '\x02' || Text[k] == '\x03' || Text[k] == '\x04' || Text[k] == '\x05' || Text[k] == '\x06' || Text[k] == '\x07' || Text[k] == '\x0E' || Text[k] == '\x0F' || Text[k] == '\x10' || Text[k] == '\x11'))
                     {
@@ -726,12 +739,12 @@ namespace Whiplash
                 }
                 else if (Text[j] == '<')
                 {
-                    Name = "&__compare_lf_func";
+                    Name = "&__compare_gf_func";
                     cp = true;
                 }
                 else if (Text[j] == '>')
                 {
-                    Name = "&__compare_gf_func";
+                    Name = "&__compare_lf_func";
                     cp = true;
                 }
                 else if (Text[j] == '\x01')

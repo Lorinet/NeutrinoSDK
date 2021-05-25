@@ -99,7 +99,7 @@ OP_SPOP = 0x95
 OP_POPB = 0x96
 OP_VPUSHB = 0x97
 OP_LINK = 0x98
-OP_EXTCALL = 0x99
+OP_LEAP = 0x99
 OP_HALT = 0xB0
 
 source = ""
@@ -433,7 +433,7 @@ for s in code:
         obi += 1
 
 for i in range(len(code)):
-    if code[i].startswith("extcall"):
+    if code[i].startswith("leap"):
         sym = code[i].split(' ')[1]
         si = 0
         oi = 0
@@ -444,9 +444,10 @@ for i in range(len(code)):
                 oi = v[1]
                 found = True
         if not found:
-            code[i] = s_remove(code[i], 0, 3)
+            code[i] = s_remove(code[i], 0, 4)
+            code[i] = "call" + code[i];
         else:
-            code[i] = "extcall " + str(oi) + " " + str(si)
+            code[i] = "leap " + str(oi) + " " + str(si)
     elif code[i].startswith("extmovl"):
         sym = code[i].split(' ')[1]
         lv = code[i].split(' ')[2]
@@ -801,8 +802,8 @@ for s in executedCode:
         pcode.append(OP_LINK)
         pcode.append(to_byte(len(arg[1])))
         pcode.extend(s_to_bytes(arg[1]))
-    elif op == "extcall":
-        instr_simple(OP_EXTCALL)
+    elif op == "leap":
+        instr_simple(OP_LEAP)
         pcode.extend(to_bytes(int_lit(arg[1], 0)))
         pcode.extend(to_bytes(int_lit(arg[2], 0)))
     elif op == "extmovl":
@@ -814,7 +815,7 @@ for s in executedCode:
     elif op == "halt" or op == "leave":
         instr_simple(OP_HALT)
     elif not op.startswith(":") and not op.startswith(";"):
-        rage_quit(12, "invalid term " + op)
+        rage_quit(12, "invalid term " + op + " (instruction " + str(pc) + ", line '" + s + "')")
     pc += 1
 
 if "-silent" not in flags:
