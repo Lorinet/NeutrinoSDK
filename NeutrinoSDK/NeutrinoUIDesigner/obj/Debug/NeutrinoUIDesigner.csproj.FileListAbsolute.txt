@@ -1,7 +1,6 @@
 C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NeutrinoUIDesigner\bin\Debug\uieditor.exe.config
 C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NeutrinoUIDesigner\bin\Debug\uieditor.exe
 C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NeutrinoUIDesigner\bin\Debug\uieditor.pdb
-C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NeutrinoUIDesigner\obj\Debug\NeutrinoUIDesigner.csprojAssemblyReference.cache
 C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NeutrinoUIDesigner\obj\Debug\NeutrinoUIDesigner.AboutWindow.resources
 C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NeutrinoUIDesigner\obj\Debug\NeutrinoUIDesigner.AddElementDialogueBox.resources
 C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NeutrinoUIDesigner\obj\Debug\NeutrinoUIDesigner.Form1.resources
@@ -11,3 +10,4 @@ C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NeutrinoUIDesigner\obj\D
 C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NeutrinoUIDesigner\obj\Debug\NeutrinoUIDesigner.csproj.CoreCompileInputs.cache
 C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NeutrinoUIDesigner\obj\Debug\uieditor.exe
 C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NeutrinoUIDesigner\obj\Debug\uieditor.pdb
+C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NeutrinoUIDesigner\obj\Debug\NeutrinoUIDesigner.csproj.AssemblyReference.cache

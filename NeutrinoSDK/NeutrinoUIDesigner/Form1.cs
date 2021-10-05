@@ -22,7 +22,7 @@ namespace NeutrinoUIDesigner
         public Form1(string[] args)
         {
             InitializeComponent();
-            Items = new List<Item>() { new Item("<View>", "") };
+            Items = new List<Item>() { new Item("<View>", ""), new Item("WindowInfo", "ID:0;Position X:-1;Position Y:-1;Width:-1;Height:-1;Title:Window;TitleBar:1;MaximizeButton:1;Hidden:0;Maximized:0;StickyDraw:0;WakeOnInteraction:0;") };
             ReloadItems();
             SaveFile = "";
             UnsavedWork = false;
@@ -91,7 +91,7 @@ namespace NeutrinoUIDesigner
         private void newViewToolStripMenuItem_Click(object sender, EventArgs e)
         {
             SaveFile = "";
-            Items = new List<Item>() { new Item("<View>", "") };
+            Items = new List<Item>() { new Item("<View>", ""), new Item("WindowInfo", "ID:0;Position X:-1;Position Y:-1;Width:-1;Height:-1;Title:Window;TitleBar:1;MaximizeButton:1;Hidden:0;Maximized:0;StickyDraw:0;WakeOnInteraction:0;") };
             ReloadItems();
         }
 
@@ -262,6 +262,28 @@ namespace NeutrinoUIDesigner
                 }
                 else MessageBox.Show("The selected file is not a valid View Designer source file. Please select another file!", "Invalid file", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
             }
+            else if(Path.GetExtension(file) == ".py")
+            {
+                string ser = "";
+                List<string> f = new List<string>(File.ReadAllLines(file, Encoding.GetEncoding(1252)));
+                for (int i = 0; i < f.Count; i++)
+                {
+                    if (f[i].TrimStart().StartsWith("text = "))
+                    {
+                        ser = f[i].TrimStart().Remove(0, 8);
+                        break;
+                    }
+                }
+                if (ser.Length > 0)
+                {
+                    ser = ser.Remove(ser.Length - 1, 1);
+                    ser.Replace("\\\"", "\"");
+                    Items = new List<Item>() { new Item("<View>", ser) };
+                    SaveFile = file;
+                    LoadElementsFromView();
+                }
+                else MessageBox.Show("The selected file is not a valid View Designer source file. Please select another file!", "Invalid file", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+            }
             else
             {
                 Items = new List<Item>() { new Item("<View>", File.ReadAllText(file)) };
@@ -272,7 +294,7 @@ namespace NeutrinoUIDesigner
         private void openToolStripMenuItem_Click(object sender, EventArgs e)
         {
             OpenFileDialog od = new OpenFileDialog();
-            od.Filter = "Neutrino Source Files (*.ns)|*.ns|Layout Files (*.la)|*.la|All files (*.*)|*.*";
+            od.Filter = "Whiplash Python files (*.py)|*.py|Neutrino Source Files (*.ns)|*.ns|Layout Files (*.txt)|*.txt|All files (*.*)|*.*";
             od.Title = "Open layout";
             if(od.ShowDialog() == DialogResult.OK)
             {
@@ -293,7 +315,7 @@ namespace NeutrinoUIDesigner
         private void saveAsToolStripMenuItem_Click(object sender, EventArgs e)
         {
             SaveFileDialog sd = new SaveFileDialog();
-            sd.Filter = "Neutrino Source Files (*.ns)|*.ns|Layout Files (*.la)|*.la|All files (*.*)|*.*";
+            sd.Filter = "Whiplash Python files (*.py)|*.py|Neutrino Source Files (*.ns)|*.ns|Layout Files (*.txt)|*.txt|All files (*.*)|*.*";
             sd.Title = "Save layout as";
             if (sd.ShowDialog() == DialogResult.OK)
             {
@@ -305,7 +327,8 @@ namespace NeutrinoUIDesigner
         private void Save()
         {
             string name = Path.GetFileNameWithoutExtension(SaveFile);
-            if (Path.GetExtension(SaveFile) == ".ns") File.WriteAllText(SaveFile, "; " + name + " View Layout\n\n:" + name + "_CreateView\nspush \"" + Items[0].Text.Replace("\"", "\\\"") + "\"\nextcall WMCreateWindow\npop __" + name + "_hwnd ; Do not modify the handle variable!\npush __" + name + "_hwnd\nextcall WMSetActiveWindow\nextcall WMUpdateView\nret\n\n:" + name + "_DestroyView\npush __" + name + "_hwnd\nextcall WMDestroyWindow\nret\n\n; Auto-generated with Neutrino UI Design Tool\n; #include " + name + ".ns\n", Encoding.GetEncoding(1252));
+            if (Path.GetExtension(SaveFile) == ".ns") File.WriteAllText(SaveFile, "; " + name + " View Layout\n\n:" + name + "_CreateView\nspush \"" + Items[0].Text.Replace("\"", "\\\"") + "\"\nleap WMCreateWindow\npop __" + name + "_hwnd ; Do not modify the handle variable!\npush __" + name + "_hwnd\nleap WMSetActiveWindow\nleap WMUpdateView\nret\n\n:" + name + "_DestroyView\npush __" + name + "_hwnd\nleap WMDestroyWindow\nret\n\n; Auto-generated with Neutrino UI Design Tool\n; #include " + name + ".ns\n", Encoding.GetEncoding(1252));
+            else if (Path.GetExtension(SaveFile) == ".py") File.WriteAllText(SaveFile, "# " + name + " View Layout\n# Auto-generated with Neutrino UI Design Tool\n# import " + Path.GetFileNameWithoutExtension(SaveFile) + "\n\n!('link userlib.lnx')\ndef " + name + "_create_view():\n\ttext = \"" + Items[0].Text.Replace("\"", "\\\"") + "\"\n\tid = WMCreateWindow(text)\n\tWMSetActiveWindow(id)\n\tWMUpdateView()\n\treturn id\n");
             else File.WriteAllText(SaveFile, Items[0].Text, Encoding.GetEncoding(1252));
             UnsavedWork = false;
         }
@@ -343,7 +366,7 @@ namespace NeutrinoUIDesigner
         {
             UnsavedWork = true;
             Dictionary<string, string> ps = new Dictionary<string, string>();
-            for(int i = 0; i < dataGridView1.Rows.Count; i++)
+            for(int i = 0; i < dataGridView1.Rows.Count - 1; i++)
             {
                 try
                 {
