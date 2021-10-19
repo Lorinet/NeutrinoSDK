@@ -22,7 +22,7 @@ namespace NeutrinoUIDesigner
         public Form1(string[] args)
         {
             InitializeComponent();
-            Items = new List<Item>() { new Item("<View>", ""), new Item("WindowInfo", "ID:0;Position X:-1;Position Y:-1;Width:-1;Height:-1;Title:Window;TitleBar:1;MaximizeButton:1;Hidden:0;Maximized:0;StickyDraw:0;WakeOnInteraction:0;") };
+            Items = new List<Item>() { new Item("<View>", ""), new Item("WindowInfo", "ID:0;Type:WindowInfo;Position X:-1;Position Y:-1;Width:-1;Height:-1;Title:Window;TitleBar:1;MaximizeButton:1;Hidden:0;Maximized:0;StickyDraw:0;WakeOnInteraction:0;") };
             ReloadItems();
             SaveFile = "";
             UnsavedWork = false;
@@ -91,7 +91,7 @@ namespace NeutrinoUIDesigner
         private void newViewToolStripMenuItem_Click(object sender, EventArgs e)
         {
             SaveFile = "";
-            Items = new List<Item>() { new Item("<View>", ""), new Item("WindowInfo", "ID:0;Position X:-1;Position Y:-1;Width:-1;Height:-1;Title:Window;TitleBar:1;MaximizeButton:1;Hidden:0;Maximized:0;StickyDraw:0;WakeOnInteraction:0;") };
+            Items = new List<Item>() { new Item("<View>", ""), new Item("WindowInfo", "ID:0;Type:WindowInfo;Position X:-1;Position Y:-1;Width:-1;Height:-1;Title:Window;TitleBar:1;MaximizeButton:1;Hidden:0;Maximized:0;StickyDraw:0;WakeOnInteraction:0;") };
             ReloadItems();
         }
 

@@ -5,6 +5,9 @@ import os
 
 OP_NOP = 0x01
 OP_DELFLD = 0x02
+OP_LDLOC = 0x03
+OP_STLOC = 0x04
+OP_SWSCOP = 0x05
 OP_AND = 0x11
 OP_OR = 0x12
 OP_XOR = 0x13
@@ -272,6 +275,12 @@ def instr_var_ival(op, var1, ival):
     instr_simple(op)
     cr_var(var1)
     pcode.extend(to_bytes(var[var1]))
+    pcode.extend(to_bytes(ival))
+
+def instr_ival(op, ival):
+    global pcode;
+    global var;
+    instr_simple(op)
     pcode.extend(to_bytes(ival))
 
 def instr_var(op, var1):
@@ -548,6 +557,12 @@ for s in executedCode:
     op = arg[0].lower()
     if op == "nop":
         instr_simple(OP_NOP)
+    elif op == "ldloc":
+        instr_var(OP_LDLOC, arg[1])
+    elif op == "stloc":
+        instr_var(OP_STLOC, arg[1])
+    elif op == "swscop":
+        instr_ival(OP_SWSCOP, arg[1])
     elif op == "and":
         instr_var_var(OP_AND, arg[1], arg[2])
     elif op == "or":
@@ -733,7 +748,7 @@ for s in executedCode:
     elif op == "ljge":
         instr_lbranch(OP_LJGE, arg[1])
     elif op == "jsp":
-        instr_simple(OP_JSP)
+        instr_var(OP_JSP, arg[1])
     elif op == "ints":
         instr_simple(OP_INTS)
         interrupt = int_lit(arg[1], 0)
