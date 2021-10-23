@@ -8,46 +8,28 @@ OP_DELFLD = 0x02
 OP_LDLOC = 0x03
 OP_STLOC = 0x04
 OP_SWSCOP = 0x05
+OP_LDLOCB = 0x06
+OP_STLOCB = 0x07
+OP_SWSCOPB = 0x08
 OP_AND = 0x11
 OP_OR = 0x12
 OP_XOR = 0x13
 OP_SHL = 0x14
 OP_SHR = 0x15
 OP_NOT = 0x16
-OP_ST = 0x20
 OP_TOSTR = 0x21
 OP_CLR = 0x22
-OP_MOV = 0x23
-OP_CONCAT = 0x24
 OP_PARSEINT = 0x25
-OP_SPLIT = 0x26
 OP_INDEX = 0x27
-OP_SIZE = 0x28
-OP_APPEND = 0x29
 OP_NEWOBJ = 0x2A
-OP_STB = 0x2B
-OP_PUSHB = 0x2C
-OP_CONCATB = 0x2D
-OP_APPENDB = 0x2E
-OP_CLRB = 0x2F
+OP_LDGLB = 0x2C
 OP_PUSHL = 0x30
 OP_SCMP = 0x31
 OP_ADD = 0x40
 OP_SUB = 0x41
 OP_MUL = 0x42
 OP_DIV = 0x43
-OP_INC = 0x44
-OP_DEC = 0x45
-OP_IMUL = 0x46
-OP_IDIV = 0x47
 OP_CMP = 0x50
-OP_CZ = 0x51
-OP_CMPS = 0x52
-OP_CMPI = 0x53
-OP_CMPB = 0x54
-OP_CZB = 0x55
-OP_CMPIB = 0x56
-OP_INSERT = 0x57
 OP_VAC = 0x58
 OP_LDELEM = 0x59
 OP_VAD = 0x5A
@@ -56,55 +38,34 @@ OP_VADE = 0x5C
 OP_LDFLD = 0x5D
 OP_STFLD = 0x5E
 OP_SWAP = 0x5F
-OP_JMP = 0x60
-OP_JEQ = 0x61
-OP_JNE = 0x62
-OP_JLE = 0x63
-OP_JGE = 0x64
-OP_JLT = 0x65
-OP_JGT = 0x66
-OP_JZ = 0x67
-OP_JNZ = 0x68
+OP_LEAP = 0x60
+OP_IFEQ = 0x61
+OP_IFNE = 0x62
+OP_IFLE = 0x63
+OP_IFGE = 0x64
+OP_IFLT = 0x65
+OP_IFGT = 0x66
 OP_RET = 0x69
 OP_EMIT = 0x6A
-OP_MOVPC = 0x6B
-OP_LJ = 0x6C
-OP_SJ = 0x6D
-OP_SJE = 0x6E
-OP_SJNE = 0x6F
-OP_SJLE = 0x70
-OP_SJGE = 0x71
-OP_SJL = 0x72
-OP_SJG = 0x73
-OP_SJZ = 0x74
-OP_SJNZ = 0x75
+OP_BR = 0x6B
+OP_JMP = 0x6C
 OP_LDLEN = 0x76
 OP_STELEM = 0x77
-OP_EXTMOVL = 0x78
-OP_LJL = 0x79
-OP_LJG = 0x7A
-OP_LJE = 0x7B
-OP_LJNE = 0x7C
-OP_LJGE = 0x7D
-OP_LJLE = 0x7E
-OP_JSP = 0x7F
-OP_INTS = 0x80
-OP_INT = 0x81
+OP_PUSHLX = 0x78
+OP_INTR = 0x81
 OP_BREAK = 0x82
-OP_INTB = 0x83
-OP_BITS = 0x84
-OP_ADDS = 0x85
-OP_PUSH = 0x90
-OP_POP = 0x91
-OP_POPA = 0x92
-OP_SPUSH = 0x93
+OP_LDGL = 0x90
+OP_STGL = 0x91
+OP_LDI = 0x92
+OP_LDSTR = 0x93
 OP_TOP = 0x94
 OP_SPOP = 0x95
-OP_POPB = 0x96
-OP_VPUSHB = 0x97
+OP_STGLB = 0x96
 OP_LINK = 0x98
-OP_LEAP = 0x99
-OP_HALT = 0xB0
+OP_LDB = 0x99
+OP_LDIB = 0x9A
+OP_TOPB = 0x9B
+OP_LDSTRB = 0x9C
 
 source = ""
 binary = ""
@@ -155,8 +116,8 @@ def s_replace(line, fro, to):
 def s_remove(line, fro, to):
     return line[0:fro] + line[fro + to:]
 
-def to_bytes(i):
-    return i.to_bytes(4, "little")
+def to_bytes(intv):
+    return intv.to_bytes(4, "little")
 
 def s_to_bytes(s):
     return bytearray(s, "cp1252")
@@ -187,109 +148,26 @@ def instr_simple(op):
     global pcode;
     pcode.append(op)
 
-def instr_branch(opr, ops, lbl):
+def instr_byte_ival(opr, opb, ival):
     global pcode;
-    global labels;
-    lab = lbl.replace(":", "")
-    if lab in labels:
-        addr = labels[lab]
-        if addr < 256:
-            instr_simple(ops)
-            pcode.append(to_byte(addr))
-        else:
-            instr_simple(opr)
-            pcode.extend(to_bytes(addr))
-    else:
-        rage_quit(11, "label not found: " + lab)
-
-def instr_lbranch(op, lbl):
-    global pcode;
-    global labels;
-    lab = lbl.replace(":", "")
-    if lab in labels:
-        addr = labels[lab]
-        instr_simple(op)
-        pcode.extend(to_bytes(addr))
-    else:
-        rage_quit(11, "label not found: " + lab)
-
-def instr_byte_var(opr, opb, var1):
-    global pcode;
-    global var;
-    cr_var(var1)
-    vk1 = var[var1]
-    if vk1 < 256:
+    if ival < 256:
         instr_simple(opb)
-        pcode.append(to_byte(vk1))
+        pcode.append(to_byte(ival))
     else:
-        instr_var(opr, var1)
+        instr_simple(opr)
+        pcode.extend(to_bytes(ival))
 
-def instr_byte_var_var(opr, opb, var1, var2):
+def instr_byte_var(opr, opb, name):
     global pcode;
     global var;
-    cr_var(var1)
-    cr_var(var2)
-    vk1 = var[var1]
-    vk2 = var[var2]
-    if vk1 < 256 and vk2 < 256:
+    cr_var(name)
+    vk = var[name]
+    if vk < 256:
         instr_simple(opb)
-        pcode.append(to_byte(vk1))
-        pcode.append(to_byte(vk2))
+        pcode.append(to_byte(vk))
     else:
-        instr_var_var(opr, var1, var2)
-
-def instr_byte_var(opr, opb, var1):
-    global pcode;
-    global var;
-    cr_var(var1)
-    vk1 = var[var1]
-    if vk1 < 256:
-        instr_simple(opb)
-        pcode.append(to_byte(vk1))
-    else:
-        instr_var(opr, var1)
-
-def instr_var_var_var(op, var1, var2, var3):
-    global pcode;
-    global var;
-    instr_simple(op)
-    cr_var(var1)
-    cr_var(var2)
-    cr_var(var3)
-    pcode.extend(to_bytes(var[var1]))
-    pcode.extend(to_bytes(var[var2]))
-    pcode.extend(to_bytes(var[var3]))
-
-def instr_var_var(op, var1, var2):
-    global pcode;
-    global var;
-    instr_simple(op)
-    cr_var(var1)
-    cr_var(var2)
-    pcode.extend(to_bytes(var[var1]))
-    pcode.extend(to_bytes(var[var2]))
-
-def instr_var_ival(op, var1, ival):
-    global pcode;
-    global var;
-    instr_simple(op)
-    cr_var(var1)
-    pcode.extend(to_bytes(var[var1]))
-    pcode.extend(to_bytes(ival))
-
-def instr_ival(op, ival):
-    global pcode;
-    global var;
-    instr_simple(op)
-    pcode.extend(to_bytes(ival))
-
-def instr_var(op, var1):
-    global pcode;
-    global var;
-    instr_simple(op)
-    cr_var(var1)
-    pcode.extend(to_bytes(var[var1]))
-
+        instr_simple(opr)
+        pcode.extend(to_bytes(vk))
 
 if len(sys.argv) == 2:
     if sys.argv[1] == "-help":
@@ -443,24 +321,8 @@ for s in code:
         obi += 1
 
 for i in range(len(code)):
-    if code[i].startswith("leap"):
+    if code[i].startswith("pushlx"):
         sym = code[i].split(' ')[1]
-        si = 0
-        oi = 0
-        found = False
-        for v in extmtds:
-            if sym in extmtds[v]:
-                si = extmtds[v][sym]
-                oi = v[1]
-                found = True
-        if not found:
-            code[i] = s_remove(code[i], 0, 4)
-            code[i] = "call" + code[i];
-        else:
-            code[i] = "leap " + str(oi) + " " + str(si)
-    elif code[i].startswith("extmovl"):
-        sym = code[i].split(' ')[1]
-        lv = code[i].split(' ')[2]
         si = 0
         oi = 0
         found = False
@@ -471,7 +333,7 @@ for i in range(len(code)):
                 found = True
         if not found:
             rage_quit(3, "symbol not found: " + sym)
-        code[i] = "extmovl " + str(oi) + " " + str(si) + " " + str(lv)
+        code[i] = "pushlx " + str(oi) + " " + str(si)
 sections = {}
 sec = True
 for i in range(len(code)):
@@ -495,7 +357,6 @@ for i in range(len(code)):
             rage_quit(4, "label " + lt + " is already defined")
 executedSections = []
 linkedSections = []
-
 if "-genRelocTable" in flags:
     for kvp in sections:
         executedSections.append(kvp)
@@ -506,7 +367,7 @@ else:
             spl = cl.split(' ')
             if len(spl) > 1:
                 lbl = spl[1].replace(":", "")
-                if cl.startswith("jmp") or cl.startswith("call") or cl.startswith("goto") or cl.startswith("jz") or cl.startswith("jnz") or cl.startswith("jeq") or cl.startswith("jne") or cl.startswith("jlt") or cl.startswith("jgt") or cl.startswith("jle") or cl.startswith("jge") or cl.startswith("pushl") or cl.startswith("lj") or cl.startswith("lje") or cl.startswith("ljne") or cl.startswith("ljl") or cl.startswith("ljg") or cl.startswith("ljle") or cl.startswith("ljge"):
+                if spl[0] == "pushl":
                     if lbl not in executedSections:
                         executedSections.append(lbl)
 executedCode = []
@@ -557,114 +418,46 @@ for s in executedCode:
     op = arg[0].lower()
     if op == "nop":
         instr_simple(OP_NOP)
+    elif op == "delfld":
+        instr_simple(OP_DELFLD)
     elif op == "ldloc":
-        instr_var(OP_LDLOC, arg[1])
+        instr_byte_var(OP_LDLOC, OP_LDLOCB, arg[1])
     elif op == "stloc":
-        instr_var(OP_STLOC, arg[1])
+        instr_byte_var(OP_STLOC, OP_STLOCB, arg[1])
     elif op == "swscop":
-        instr_ival(OP_SWSCOP, arg[1])
+        instr_byte_ival(OP_SWSCOP, OP_SWSCOPB, int_lit(arg[1], 0))
     elif op == "and":
-        instr_var_var(OP_AND, arg[1], arg[2])
+        instr_simple(OP_AND)
     elif op == "or":
-        instr_var_var(OP_OR, arg[1], arg[2])
+        instr_simple(OP_OR)
     elif op == "xor":
-        instr_var_var(OP_XOR, arg[1], arg[2])
+        instr_simple(OP_XOR)
     elif op == "shl":
-        instr_var_var(OP_SHL, arg[1], arg[2])
+        instr_simple(OP_SHL)
     elif op == "shr":
-        instr_var_var(OP_SHR, arg[1], arg[2])
+        instr_simple(OP_SHR)
     elif op == "not":
-        instr_var(OP_NOT, arg[1])
-    elif op == "str":
-        cr_var(arg[1])
-        instr_simple(OP_ST)
-        if arg[2] == "\"\"":
-            pcode.extend(to_bytes(4))
-            pcode.extend(to_bytes(var[arg[1]]))
-        elif s[5 + len(arg[1])] == '"':
-            val = ""
-            for i in range(6 + len(arg[1]), len(s) - 1):
-                if i == len(s):
-                    val = s_remove(val, len(val) - 1, 1)
-                    break
-                val += s[i]
-            val = val.replace("\\0", "\0").replace("\\n", "\n").replace("\\\n", "\\n")
-            pcode.extend(to_bytes(4 + len(val)))
-            pcode.extend(to_bytes(var[arg[1]]))
-            pcode.extend(s_to_bytes(val))
-        else:
-            value = int_lit(s, 5 + len(arg[1]))
-            pcode.extend(to_bytes(8))
-            pcode.extend(to_bytes(var[arg[1]]))
-            pcode.extend(to_bytes(value))
-    elif op == "stb":
-        cr_var(arg[1])
-        instr_simple(OP_STB)
-        value = int_lit(s, 5 + len(arg[1]))
-        pcode.extend(to_bytes(var[arg[1]]))
-        pcode.append(to_byte(value))
-    elif op == "pushb":
-        instr_simple(OP_PUSHB)
-        value = int_lit(s, 6)
-        pcode.append(to_byte(value))
+        instr_simple(OP_NOT)
     elif op == "string" or op == "tostr":
         instr_simple(OP_TOSTR)
     elif op == "clr":
-        cr_var(arg[1])
-        vkey = var[arg[1]]
-        if vkey < 256:
-            instr_simple(OP_CLRB)
-            pcode.append(to_byte(vkey))
-        else:
-            instr_simple(OP_CLR)
-            pcode.extend(to_bytes(vkey))
-    elif op == "mov":
-        instr_var_var(OP_MOV, arg[1], arg[2])
+        instr_simple(OP_CLR)
+    elif op == "parseint":
+        instr_simple(OP_PARSEINT)
+    elif op == "index":
+        instr_simple(OP_INDEX)
+    elif op == "newobj":
+        instr_simple(OP_NEWOBJ)
+    elif op == "ldgl":
+        instr_byte_var(OP_LDGL, OP_LDGLB, arg[1])
+    elif op == "stgl":
+        instr_byte_var(OP_STGL, OP_STGLB, arg[1])
     elif op == "pushl":
         if arg[1].replace(":", "") in labels:
             instr_simple(OP_PUSHL)
             pcode.extend(to_bytes(labels[arg[1].replace(":", "")]))
         else:
             rage_quit(9, "invalid label: " + arg[1])
-    elif op == "movpc":
-        instr_var(OP_MOVPC, arg[1])
-    elif op == "split":
-        instr_var_var(OP_SPLIT, arg[1], arg[2])
-        pcode.extend(to_bytes(int_lit(arg[3], 0)))
-    elif op == "concat":
-        instr_byte_var_var(OP_CONCAT, OP_CONCATB, arg[1], arg[2])
-    elif op == "integer":
-        instr_simple(OP_PARSEINT)
-    elif op == "index":
-        instr_var_var_var(OP_INDEX, arg[1], arg[2], arg[3])
-    elif op == "inst":
-        instr_var_var_var(OP_INSERT, arg[1], arg[2], arg[3])
-    elif op == "vac":
-        instr_simple(OP_VAC)
-    elif op == "vad":
-        instr_simple(OP_VAD)
-    elif op == "ldfld":
-        instr_simple(OP_LDFLD)
-    elif op == "stfld":
-        instr_simple(OP_STFLD)
-    elif op == "vade":
-        instr_simple(OP_VADE)
-    elif op == "delelem":
-        instr_simple(OP_DELELEM)
-    elif op == "ldelem":
-        instr_simple(OP_LDELEM)
-    elif op == "swap":
-        instr_simple(OP_SWAP)
-    elif op == "ldlen":
-        instr_simple(OP_LDLEN)
-    elif op == "stelem":
-        instr_simple(OP_STELEM)
-    elif op == "size":
-        instr_var_var(OP_SIZE, arg[1], arg[2])
-    elif op == "append":
-        instr_byte_var_var(OP_APPEND, OP_APPENDB, arg[1], arg[2])
-    elif op == "newobj":
-        instr_simple(OP_NEWOBJ)
     elif op == "add":
         instr_simple(OP_ADD)
     elif op == "sub":
@@ -673,166 +466,89 @@ for s in executedCode:
         instr_simple(OP_MUL)
     elif op == "div":
         instr_simple(OP_DIV)
-    elif op == "inc":
-        instr_var_ival(OP_INC, arg[1], int_lit(s, 5 + len(arg[1])))
-    elif op == "dec":
-        instr_var_ival(OP_DEC, arg[1], int_lit(s, 5 + len(arg[1])))
-    elif op == "imul":
-        instr_var_ival(OP_IMUL, arg[1], int_lit(s, 6 + len(arg[1])))
-    elif op == "idiv":
-        instr_var_ival(OP_IDIV, arg[1], int_lit(s, 6 + len(arg[1])))
-    elif op == "scmp":
-        instr_simple(OP_SCMP)
     elif op == "cmp":
-        instr_byte_var_var(OP_CMP, OP_CMPB, arg[1], arg[2])
-    elif op == "cz":
-        instr_byte_var(OP_CZ, OP_CZB, arg[1])
-    elif op == "cmpi":
-        cr_var(arg[1])
-        if s[6 + len(arg[1])] == '"':
-            val = ""
-            for i in range(7 + len(arg[1]), len(s) - 1):
-                if i == len(s.replace("\\0", "\0").replace("\\n", "\n")):
-                    val = s_remove(val, len(val) - 1, 1)
-                    break
-                val += s.replace("\\0", "\0").replace("\\n", "\n")[i]
-            instr_simple(OP_CMPS)
-            pcode.extend(to_bytes(4 + len(val)))
-            pcode.extend(to_bytes(var[arg[1]]))
-            pcode.extend(s_to_bytes(val))
-        else:
-            value = int_lit(s, 6 + len(arg[1]))
-            vkey = var[arg[1]]
-            if vkey < 256 and value < 256:
-                instr_simple(OP_CMPIB)
-                pcode.append(to_byte(vkey))
-                pcode.append(to_byte(value))
-            else:
-                instr_simple(OP_CMPI)
-                pcode.extend(to_bytes(var[arg[1]]))
-                pcode.extend(to_bytes(value))
-    elif op == "jmp" or op == "goto" or op == "call":
-        instr_branch(OP_JMP, OP_SJ, arg[1])
-    elif op == "jeq":
-        instr_branch(OP_JEQ, OP_SJE, arg[1])
-    elif op == "jne":
-        instr_branch(OP_JNE, OP_SJNE, arg[1])
-    elif op == "jle":
-        instr_branch(OP_JLE, OP_SJLE, arg[1])
-    elif op == "jge":
-        instr_branch(OP_JGE, OP_SJGE, arg[1])
-    elif op == "jlt":
-        instr_branch(OP_JLT, OP_SJL, arg[1])
-    elif op == "jgt":
-        instr_branch(OP_JGT, OP_SJG, arg[1])
-    elif op == "jz":
-        instr_branch(OP_JZ, OP_SJZ, arg[1])
-    elif op == "jnz":
-        instr_branch(OP_JNZ, OP_SJNZ, arg[1])
-    elif op == "emit":
-        instr_var(OP_EMIT, arg[1])
-    elif op == "ret":
-        instr_simple(OP_RET)
-    elif op == "lj":
-        instr_lbranch(OP_LJ, arg[1])
-    elif op == "lje":
-        instr_lbranch(OP_LJE, arg[1])
-    elif op == "ljne":
-        instr_lbranch(OP_LJNE, arg[1])
-    elif op == "ljl":
-        instr_lbranch(OP_LJL, arg[1])
-    elif op == "ljg":
-        instr_lbranch(OP_LJG, arg[1])
-    elif op == "ljle":
-        instr_lbranch(OP_LJLE, arg[1])
-    elif op == "ljge":
-        instr_lbranch(OP_LJGE, arg[1])
-    elif op == "jsp":
-        instr_var(OP_JSP, arg[1])
-    elif op == "ints":
-        instr_simple(OP_INTS)
-        interrupt = int_lit(arg[1], 0)
-        if s[6 + len(arg[1])] == '"':
-            val = ""
-            for i in range(7 + len(arg[1]), len(s) - 1):
-                if i == len(s.replace("\\0", "\0").replace("\\n", "\n")):
-                    val = s_remove(val, len(val) - 1, 1)
-                    break
-                val += s.replace("\\0", "\0").replace("\\n", "\n")[i]
-            pcode.extend(to_bytes(1 + len(val)))
-            pcode.append(to_byte(interrupt))
-            pcode.extend(s_to_bytes(val))
-        else:
-            value = int_lit(s, 6 + len(arg[1]))
-            pcode.extend(to_bytes(5))
-            pcode.append(to_byte(interrupt))
-            pcode.extend(to_bytes(value))
-    elif op == "int" and len(arg) == 2:
-        instr_simple(OP_INTS)
-        pcode.extend(to_bytes(1))
-        pcode.append(to_byte(int_lit(arg[1], 0)))
-    elif op == "int" and len(arg) > 2:
-        cr_var(arg[2])
-        interrupt = int_lit(arg[1], 0)
-        vark = var[arg[2]]
-        if vark < 256:
-            instr_simple(OP_INTB)
-            pcode.append(to_byte(interrupt))
-            pcode.append(to_byte(vark))
-        else:
-            instr_simple(OP_INT)
-            pcode.append(to_byte(interrupt))
-            pcode.extend(to_bytes(vark))
-    elif op == "bits":
-        instr_simple(OP_BITS)
-        pcode.append(to_byte(int_lit(arg[1], 0)))
-    elif op == "adds":
-        instr_simple(OP_ADDS)
-    elif op == "break":
-        instr_simple(OP_BREAK)
-    elif op == "push":
-        instr_byte_var(OP_PUSH, OP_VPUSHB, arg[1])
-    elif op == "pop":
-        instr_byte_var(OP_POP, OP_POPB, arg[1])
-    elif op == "spop":
-        instr_simple(OP_SPOP)
-    elif op == "spush" or op == "ldstr":
-        instr_simple(OP_SPUSH)
-        if s[6] == '"':
-            val = ""
-            for i in range(7, len(s) - 1):
-                if i == len(s.replace("\\0", "\0").replace("\\n", "\n")):
-                    val = s_remove(val, len(val) - 1, 1)
-                    break
-                if i > 0:
-                    if s[i] == '"' and s[i - 1] != '\\':
-                        break
-                val += s.replace("\\0", "\0").replace("\\n", "\n")[i]
-            pcode.extend(to_bytes(len(val)))
-            pcode.extend(s_to_bytes(val))
-        else:
-            value = int_lit(arg[1], 0)
-            pcode.extend(to_bytes(4))
-            pcode.extend(to_bytes(value))
-    elif op == "top":
-        instr_simple(OP_TOP)
-        pcode.extend(to_bytes(int_lit(arg[1], 0)))
-    elif op == "link":
-        pcode.append(OP_LINK)
-        pcode.append(to_byte(len(arg[1])))
-        pcode.extend(s_to_bytes(arg[1]))
+        instr_simple(OP_CMP)
+    elif op == "vac":
+        instr_simple(OP_VAC)
+    elif op == "ldelem":
+        instr_simple(OP_LDELEM)
+    elif op == "vad":
+        instr_simple(OP_VAD)
+    elif op == "delelem":
+        instr_simple(OP_DELELEM)
+    elif op == "vade":
+        instr_simple(OP_VADE)
+    elif op == "ldfld":
+        instr_simple(OP_LDFLD)
+    elif op == "stfld":
+        instr_simple(OP_STFLD)
+    elif op == "swap":
+        instr_simple(OP_SWAP)
     elif op == "leap":
         instr_simple(OP_LEAP)
+    elif op == "ifeq":
+        instr_simple(OP_IFEQ)
+    elif op == "ifne":
+        instr_simple(OP_IFNE)
+    elif op == "ifle":
+        instr_simple(OP_IFLE)
+    elif op == "ifge":
+        instr_simple(OP_IFGE)
+    elif op == "iflt":
+        instr_simple(OP_IFLT)
+    elif op == "ifgt":
+        instr_simple(OP_IFGT)
+    elif op == "ret":
+        instr_simple(OP_RET)
+    elif op == "emit":
+        instr_simple(OP_EMIT)
+    elif op == "br":
+        instr_simple(OP_BR)
+    elif op == "jmp":
+        instr_simple(OP_JMP)
+    elif op == "ldlen":
+        instr_simple(OP_LDLEN)
+    elif op == "stelem":
+        instr_simple(OP_STELEM)
+    elif op == "pushlx":
+        instr_simple(OP_PUSHLX)
         pcode.extend(to_bytes(int_lit(arg[1], 0)))
         pcode.extend(to_bytes(int_lit(arg[2], 0)))
-    elif op == "extmovl":
-        instr_simple(OP_EXTMOVL)
-        pcode.extend(to_bytes(int_lit(arg[1], 0)))
-        pcode.extend(to_bytes(int_lit(arg[2], 0)))
-        cr_var(arg[3])
-        pcode.extend(to_bytes(var[arg[3]]))
-    elif op == "halt" or op == "leave":
-        instr_simple(OP_HALT)
+    elif op == "intr":
+        instr_simple(OP_INTR)
+        pcode.append(int_lit(arg[1], 0))
+    elif op == "break":
+        instr_simple(OP_BREAK)
+    elif op == "ldi":
+        instr_byte_ival(OP_LDI, OP_LDIB, int_lit(arg[1], 0));
+    elif op == "ldstr":
+        val = ""
+        for i in range(7, len(s) - 1):
+            if i == len(s.replace("\\0", "\0").replace("\\n", "\n")):
+                val = s_remove(val, len(val) - 1, 1)
+                break
+            if i > 0:
+                if s[i] == '"' and s[i - 1] != '\\':
+                    break
+            val += s.replace("\\0", "\0").replace("\\n", "\n")[i]
+        if len(val) > 255:
+            instr_simple(OP_LDSTR)
+            pcode.extend(to_bytes(len(val)))
+        else:
+            instr_simple(OP_LDSTRB)
+            pcode.append(to_byte(len(val)))
+        pcode.extend(s_to_bytes(val))
+    elif op == "spop":
+        instr_simple(OP_SPOP)
+    elif op == "ldb":
+        instr_simple(OP_LDB)
+        pcode.append(int_lit(arg[1], 0))
+    elif op == "link":
+        instr_simple(OP_LINK)
+        pcode.append(to_byte(len(arg[1])))
+        pcode.extend(s_to_bytes(arg[1]))
+    elif op == "top":
+        instr_byte_ival(OP_TOP, OP_TOPB, int_lit(arg[1], 0))
     elif not op.startswith(":") and not op.startswith(";"):
         rage_quit(12, "invalid term " + op + " (instruction " + str(pc) + ", line '" + s + "')")
     pc += 1
