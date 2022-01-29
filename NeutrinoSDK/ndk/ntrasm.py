@@ -52,6 +52,7 @@ OP_JMP = 0x6C
 OP_LDLEN = 0x76
 OP_STELEM = 0x77
 OP_PUSHLX = 0x78
+OP_GC = 0x79
 OP_INTR = 0x81
 OP_BREAK = 0x82
 OP_LDGL = 0x90
@@ -500,6 +501,8 @@ for s in executedCode:
         instr_simple(OP_IFGT)
     elif op == "ret":
         instr_simple(OP_RET)
+    elif op == "gc":
+        instr_simple(OP_GC)
     elif op == "emit":
         instr_simple(OP_EMIT)
     elif op == "br":

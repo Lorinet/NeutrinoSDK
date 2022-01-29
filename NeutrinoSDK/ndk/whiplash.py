@@ -49,6 +49,9 @@ def process_code(code, label):
     
     def m_ret():
         meth[label].append('ret')
+    
+    def m_gc():
+        meth[label].append('gc')
 
     def m_top(index):
         meth[label].append('top ' + str(index))
@@ -100,6 +103,7 @@ def process_code(code, label):
                 # m_spop() this is used only for returnless functions, so nada.
                 pass
             elif i.opname == "RETURN_VALUE":
+                m_gc()
                 m_ret()
             elif i.opname == "LOAD_FAST":
                 m_ldloc(i.argval)
