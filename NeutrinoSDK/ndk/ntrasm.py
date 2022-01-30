@@ -62,6 +62,7 @@ OP_LDSTR = 0x93
 OP_TOP = 0x94
 OP_SPOP = 0x95
 OP_STGLB = 0x96
+OP_DUP = 0x97
 OP_LINK = 0x98
 OP_LDB = 0x99
 OP_LDIB = 0x9A
@@ -503,6 +504,8 @@ for s in executedCode:
         instr_simple(OP_RET)
     elif op == "gc":
         instr_simple(OP_GC)
+    elif op == "dup":
+        instr_simple(OP_DUP)
     elif op == "emit":
         instr_simple(OP_EMIT)
     elif op == "br":
