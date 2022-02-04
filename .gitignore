@@ -3,3 +3,6 @@ obj
 .vs
 NeutrinoSDK/.vs/
 NeutrinoSDK/PythonNDK/.vscode/
+NeutrinoSDK/ndk/test.py
+NeutrinoSDK/ndk/test.ns
+NeutrinoSDK/ndk/test.lex

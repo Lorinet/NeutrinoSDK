@@ -49,6 +49,7 @@ OP_RET = 0x69
 OP_EMIT = 0x6A
 OP_BR = 0x6B
 OP_JMP = 0x6C
+OP_BRP = 0x6D
 OP_LDLEN = 0x76
 OP_STELEM = 0x77
 OP_PUSHLX = 0x78
@@ -369,7 +370,7 @@ else:
             spl = cl.split(' ')
             if len(spl) > 1:
                 lbl = spl[1].replace(":", "")
-                if spl[0] == "pushl":
+                if spl[0] == "pushl" or spl[0] == "brp":
                     if lbl not in executedSections:
                         executedSections.append(lbl)
 executedCode = []
@@ -510,6 +511,12 @@ for s in executedCode:
         instr_simple(OP_EMIT)
     elif op == "br":
         instr_simple(OP_BR)
+    elif op == "brp":
+        if arg[1].replace(":", "") in labels:
+            instr_simple(OP_BRP)
+            pcode.extend(to_bytes(labels[arg[1].replace(":", "")]))
+        else:
+            rage_quit(9, "invalid label: " + arg[1])
     elif op == "jmp":
         instr_simple(OP_JMP)
     elif op == "ldlen":

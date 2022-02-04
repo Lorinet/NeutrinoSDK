@@ -25,6 +25,8 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
     makefunction = False
     buildClassNextPass = False
     glbPfx = ""
+    # (name, end, operator): end: -1 for everything not handled by jump_forward; condition: if operator in case of comparation.
+    blocks = [(label, -1)]
 
     classInitCodeObject = None
 
@@ -38,69 +40,109 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
     if label == 'main':
         meth[label].append('link whiprtl.lnx')
 
+    def cbn():
+        return blocks[len(blocks) - 1][0]
+    
+    def make_meth(m):
+        global methcntr
+        methcntr += 1
+        meth[m[0]] = []
+        blocks.append(m)
+
     def m_ldgl(val):
-        meth[label].append('ldgl ' + str(val))
+        meth[cbn()].append('ldgl ' + str(val))
 
     def m_ldstr(val):
         if isinstance(val, str):
-            meth[label].append('ldstr "' + str(val) + '"')
+            meth[cbn()].append('ldstr "' + str(val) + '"')
         elif isinstance(val, int):
             if val < 256:
-                meth[label].append('ldb ' + str(val))
+                meth[cbn()].append('ldb ' + str(val))
             else:
-                meth[label].append('ldi ' + str(val))
+                meth[cbn()].append('ldi ' + str(val))
 
     def m_leap():
-        meth[label].append('leap')
+        meth[cbn()].append('leap')
 
-    def m_br(index):
-        meth[label].append('br ' + str(index))
+    def m_brp(lbl):
+        meth[cbn()].append('brp ' + str(lbl))
 
     def m_stgl(name):
         if str(name) not in declGlbl:
             declGlbl.append(str(name))
-        meth[label].append('stgl ' + glbPfx + str(name))
+        meth[cbn()].append('stgl ' + glbPfx + str(name))
     
     def m_pushl(name):
-        meth[label].append('pushl ' + str(name))
+        meth[cbn()].append('pushl ' + str(name))
     
     def m_spop():
-        meth[label].append('spop')
+        meth[cbn()].append('spop')
     
     def m_ret():
-        meth[label].append('ret')
+        meth[cbn()].append('ret')
     
     def m_gc():
-        meth[label].append('gc')
+        meth[cbn()].append('gc')
 
     def m_top(index):
-        meth[label].append('top ' + str(index))
+        meth[cbn()].append('top ' + str(index))
 
     def m_ldloc(name):
         stack.append(str(name))
-        meth[label].append('ldloc ' + str(name))
+        meth[cbn()].append('ldloc ' + str(name))
         
     def m_stloc(name):
-        meth[label].append('stloc ' + str(name))
+        meth[cbn()].append('stloc ' + str(name))
     
     def m_stfld(index):
-        meth[label].append('ldi ' + str(index))
-        meth[label].append('stfld')
+        meth[cbn()].append('ldi ' + str(index))
+        meth[cbn()].append('stfld')
     
     def m_ldfld(index):
-        meth[label].append('ldi ' + str(index))
-        meth[label].append('ldfld')
+        meth[cbn()].append('ldi ' + str(index))
+        meth[cbn()].append('ldfld')
     
     def m_dup():
-        meth[label].append('dup')
+        meth[cbn()].append('dup')
     
     def m_add():
-        meth[label].append('add')
+        meth[cbn()].append('add')
 
     def m_newobj():
-        meth[label].append('newobj')
+        meth[cbn()].append('newobj')
     
-    meth[label].append("swscop " + str(methcntr))
+    def m_cmp():
+        meth[cbn()].append('cmp')
+    
+    def m_cond(operator):
+        if operator == "<":
+            meth[cbn()].append('iflt')
+        elif operator == ">":
+            meth[cbn()].append('ifgt')
+        elif operator == "==":
+            meth[cbn()].append('ifeq')
+        elif operator == "!=":
+            meth[cbn()].append('ifne')
+        elif operator == "<=":
+            meth[cbn()].append('ifle')
+        elif operator == ">=":
+            meth[cbn()].append('ifge')
+
+    def m_cond_inv(operator):
+        if operator == "<":
+            meth[cbn()].append('ifge')
+        elif operator == ">":
+            meth[cbn()].append('ifle')
+        elif operator == "==":
+            meth[cbn()].append('ifne')
+        elif operator == "!=":
+            meth[cbn()].append('ifeq')
+        elif operator == "<=":
+            meth[cbn()].append('ifgt')
+        elif operator == ">=":
+            meth[cbn()].append('iflt')
+    
+    meth[cbn()].append("swscop " + str(methcntr))
     args = code.co_varnames[:code.co_argcount]
     for r in reversed(range(len(args))):
         if r == 0 and initClass:
@@ -154,9 +196,41 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
                     m_stgl(i.argval)
                 elif i.opname == "LOAD_CONST" and i.argval != None:
                     m_ldstr(i.argval)
+                elif i.opname == "COMPARE_OP" and i.argval != None:
+                    m_cmp()
+                    m_cond(str(i.argval))
+                    methcntr += 1
+                    nbn = cbn() + "@" + str(methcntr) + "@if"
+                    m_brp(nbn)
+                    make_meth((nbn, -1, str(i.argval)))
+                    ix += 1
+                elif i.opname == "JUMP_FORWARD" and i.argval != None:
+                    m_ret()
+                    cn = blocks[len(blocks) - 1][2]
+                    blocks.pop()
+                    nbn = cbn() + "@" + str(methcntr) + "@else"
+                    if cn == "":
+                        # it's an else block, it skips parent now
+                        m_ret()
+                        cn = blocks[len(blocks) - 1][2]
+                        blocks.pop()
+                        nbn = cbn() + "@" + str(methcntr) + "@else"
+                    m_cond_inv(cn)
+                    m_brp(nbn)
+                    methcntr += 1
+                    make_meth((nbn, ix + (i.arg / 2), ""))
+                elif i.opname == "JUMP_ABSOLUTE" and i.argval != None:
+                    m_ret()
+                    cn = blocks[len(blocks) - 1][2]
+                    blocks.pop()
+                    m_cond_inv(cn)
+                    nbn = cbn() + "@" + str(methcntr) + "@else"
+                    m_brp(nbn)
+                    methcntr += 1
+                    make_meth((nbn, i.arg / 2, ""))
                 elif i.opname == "CALL_FUNCTION" or i.opname == "CALL_METHOD":
                     if buildClassNextPass:
-                        meth[label].pop()
+                        meth[cbn()].pop()
                         buildClassNextPass = False
                     else:
                         if i.argval > 0:
@@ -164,11 +238,11 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
                         m_leap()
                 elif i.opname == "MAKE_FUNCTION":
                     makefunction = True
-                    mk = meth[label][len(meth[label]) - 1].split(' ')[1].replace('"', '')
+                    mk = meth[cbn()][len(meth[cbn()]) - 1].split(' ')[1].replace('"', '')
                     on = methRecStack[len(methRecStack) - 1]
                     meth[mk] = meth.pop(on)
                     methRecStack.pop()
-                    del meth[label][len(meth[label]) - 1]
+                    del meth[cbn()][len(meth[cbn()]) - 1]
                     for cl in range(len(meth[mk])):
                         if meth[mk][cl].startswith("stgl"):
                             meth[mk][cl] = meth[mk][cl].replace("%" + on + "%", mk + ".")
@@ -206,12 +280,12 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
                         attrcntr += 1
                     m_stfld(attrIdx[i.argval])
                 elif i.opname == "LOAD_ATTR" or i.opname == "LOAD_METHOD":
-                    vaspl = meth[label][len(meth[label]) - 1].split(' ')
+                    vaspl = meth[cbn()][len(meth[cbn()]) - 1].split(' ')
                     if vaspl[0] == "ldgl" and vaspl[1] in classes:
                         vano = vaspl[1] + '.' + i.argval
                         if vano not in declGlbl:
                             declGlbl.append(vano)
-                        meth[label][len(meth[label]) - 1] = "ldgl " + vano
+                        meth[cbn()][len(meth[cbn()]) - 1] = "ldgl " + vano
                     else:
                         if i.opname == "LOAD_METHOD":
                             m_dup();
@@ -223,11 +297,17 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
                     buildClassNextPass = True
                 elif i.opname == "BINARY_ADD":
                     m_add()
+                elif i.opname == "INPLACE_ADD":
+                    m_add()
         else:
             if i == "init_label":
                 methcntr += 1
                 process_code(classInitCodeObject, str(methcntr), initClass=True, buildClassName=buildClassName)
         ix += 1
+        if blocks[len(blocks) - 1][1] > -1:
+            if ix > blocks[len(blocks) - 1][1]:
+                m_ret()
+                blocks.pop()
 
 def compile_file(file, out):
     global asm
