@@ -183,7 +183,6 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
                         bcn = str(i.argval.co_name)
                         classes.append(str(i.argval.co_name))
                         classMeth[str(i.argval.co_name)] = []
-                    #process_code(i.argval, str(methcntr), buildClass=buildClassNextPass, buildClassName=bcn)
                     process_code(i.argval, str(i.argval.co_name), buildClass=buildClassNextPass, buildClassName=bcn)
                     if buildClassNextPass:
                         # this is a dirty little hack to get class name from code object. subject to change.
