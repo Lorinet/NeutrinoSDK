@@ -26,7 +26,7 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
     buildClassNextPass = False
     glbPfx = ""
     # (name, end, operator): end: -1 for everything not handled by jump_forward; condition: if operator in case of comparation.
-    blocks = [(label, -1)]
+    blocks = [(label, -1, "")]
 
     classInitCodeObject = None
 
@@ -183,7 +183,8 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
                         bcn = str(i.argval.co_name)
                         classes.append(str(i.argval.co_name))
                         classMeth[str(i.argval.co_name)] = []
-                    process_code(i.argval, str(methcntr), buildClass=buildClassNextPass, buildClassName=bcn)
+                    #process_code(i.argval, str(methcntr), buildClass=buildClassNextPass, buildClassName=bcn)
+                    process_code(i.argval, str(i.argval.co_name), buildClass=buildClassNextPass, buildClassName=bcn)
                     if buildClassNextPass:
                         # this is a dirty little hack to get class name from code object. subject to change.
                         m_pushl(str(i.argval.co_name))
@@ -205,20 +206,21 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
                     make_meth((nbn, -1, str(i.argval)))
                     ix += 1
                 elif i.opname == "JUMP_FORWARD" and i.argval != None:
+                    cn = blocks[len(blocks) - 1][2]
+                    while cn == "else":
+                        # it's an else block, it skips parent now
+                        m_ret()
+                        blocks.pop()
+                        cn = blocks[len(blocks) - 1][2]
+                        nbn = cbn() + "@" + str(methcntr) + "@else"
                     m_ret()
                     cn = blocks[len(blocks) - 1][2]
                     blocks.pop()
                     nbn = cbn() + "@" + str(methcntr) + "@else"
-                    if cn == "":
-                        # it's an else block, it skips parent now
-                        m_ret()
-                        cn = blocks[len(blocks) - 1][2]
-                        blocks.pop()
-                        nbn = cbn() + "@" + str(methcntr) + "@else"
                     m_cond_inv(cn)
                     m_brp(nbn)
                     methcntr += 1
-                    make_meth((nbn, ix + (i.arg / 2), ""))
+                    make_meth((nbn, ix + (i.arg / 2), "else"))
                 elif i.opname == "JUMP_ABSOLUTE" and i.argval != None:
                     m_ret()
                     cn = blocks[len(blocks) - 1][2]
@@ -227,7 +229,7 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
                     nbn = cbn() + "@" + str(methcntr) + "@else"
                     m_brp(nbn)
                     methcntr += 1
-                    make_meth((nbn, i.arg / 2, ""))
+                    make_meth((nbn, i.arg / 2, "else"))
                 elif i.opname == "CALL_FUNCTION" or i.opname == "CALL_METHOD":
                     if buildClassNextPass:
                         meth[cbn()].pop()
@@ -240,8 +242,9 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
                     makefunction = True
                     mk = meth[cbn()][len(meth[cbn()]) - 1].split(' ')[1].replace('"', '')
                     on = methRecStack[len(methRecStack) - 1]
-                    meth[mk] = meth.pop(on)
                     methRecStack.pop()
+                    if on != mk:
+                        meth[mk] = meth.pop(on)
                     del meth[cbn()][len(meth[cbn()]) - 1]
                     for cl in range(len(meth[mk])):
                         if meth[mk][cl].startswith("stgl"):
