@@ -1,7 +1,0 @@
-C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NtrDisasm\bin\Debug\NtrDisasm.exe.config
-C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NtrDisasm\bin\Debug\NtrDisasm.exe
-C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NtrDisasm\bin\Debug\NtrDisasm.pdb
-C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NtrDisasm\obj\Debug\NtrDisasm.csprojAssemblyReference.cache
-C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NtrDisasm\obj\Debug\NtrDisasm.csproj.CoreCompileInputs.cache
-C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NtrDisasm\obj\Debug\NtrDisasm.exe
-C:\Users\lorin\Documents\GitHub\NeutrinoSDK\NeutrinoSDK\NtrDisasm\obj\Debug\NtrDisasm.pdb
