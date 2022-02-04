@@ -1,9 +1,9 @@
 bin
 obj
 .vs
-NeutrinoSDK/.vs/
-NeutrinoSDK/PythonNDK/.vscode/
-NeutrinoSDK/ndk/test.py
-NeutrinoSDK/ndk/test.ns
-NeutrinoSDK/ndk/test.lex
-NeutrinoSDK/ndk/pycode.txt
+.vscode
+ndk/.vscode
+ndk/test.py
+ndk/test.ns
+ndk/test.lex
+ndk/pycode.txt
