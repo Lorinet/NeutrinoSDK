@@ -17,6 +17,8 @@ OP_XOR = 0x13
 OP_SHL = 0x14
 OP_SHR = 0x15
 OP_NOT = 0x16
+OP_PWR = 0x17
+OP_MOD = 0x18
 OP_TOSTR = 0x21
 OP_CLR = 0x22
 OP_PARSEINT = 0x25
@@ -50,6 +52,7 @@ OP_EMIT = 0x6A
 OP_BR = 0x6B
 OP_JMP = 0x6C
 OP_BRP = 0x6D
+OP_IRET = 0x6E
 OP_LDLEN = 0x76
 OP_STELEM = 0x77
 OP_PUSHLX = 0x78
@@ -352,7 +355,7 @@ for i in range(len(code)):
                 break
             if code[i] != "" and not code[i].startswith(";"):
                 ts.append(code[i])
-            if code[i].startswith("ret"):
+            if code[i].startswith("ret") or code[i].startswith("iret"):
                 sec = False
         if lt not in sections:
             sections[lt] = ts
@@ -441,6 +444,10 @@ for s in executedCode:
         instr_simple(OP_SHR)
     elif op == "not":
         instr_simple(OP_NOT)
+    elif op == "pwr":
+        instr_simple(OP_PWR)
+    elif op == "mod":
+        instr_simple(OP_MOD)
     elif op == "string" or op == "tostr":
         instr_simple(OP_TOSTR)
     elif op == "clr":
@@ -503,6 +510,8 @@ for s in executedCode:
         instr_simple(OP_IFGT)
     elif op == "ret":
         instr_simple(OP_RET)
+    elif op == "iret":
+        instr_simple(OP_IRET)
     elif op == "gc":
         instr_simple(OP_GC)
     elif op == "dup":

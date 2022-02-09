@@ -80,6 +80,9 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
     
     def m_ret():
         meth[cbn()].append('ret')
+
+    def m_iret():
+        meth[cbn()].append('iret')
     
     def m_gc():
         meth[cbn()].append('gc')
@@ -102,11 +105,48 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
         meth[cbn()].append('ldi ' + str(index))
         meth[cbn()].append('ldfld')
     
+    def m_delfld(index):
+        meth[cbn()].append('ldi ' + str(index))
+        meth[cbn()].append('delfld')
+    
     def m_dup():
         meth[cbn()].append('dup')
     
     def m_add():
         meth[cbn()].append('add')
+    
+    def m_sub():
+        meth[cbn()].append('sub')
+    
+    def m_mul():
+        meth[cbn()].append('mul')
+    
+    def m_div():
+        meth[cbn()].append('div')
+    
+    def m_and():
+        meth[cbn()].append('and')
+    
+    def m_or():
+        meth[cbn()].append('or')
+    
+    def m_xor():
+        meth[cbn()].append('xor')
+    
+    def m_shl():
+        meth[cbn()].append('shl')
+    
+    def m_shr():
+        meth[cbn()].append('shr')
+
+    def m_not():
+        meth[cbn()].append('not')
+    
+    def m_pwr():
+        meth[cbn()].append('pwr')
+    
+    def m_mod():
+        meth[cbn()].append('mod')
 
     def m_newobj():
         meth[cbn()].append('newobj')
@@ -114,6 +154,12 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
     def m_cmp():
         meth[cbn()].append('cmp')
     
+    def m_ldlen():
+        meth[cbn()].append('ldlen')
+    
+    def m_clr():
+        meth[cbn()].append('clr')
+
     def m_cond(operator):
         if operator == "<":
             meth[cbn()].append('iflt')
@@ -190,29 +236,33 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
                         m_leap()
                     pycode.write("\nstill " + label + ":\n")
             else:
-                if i.opname == "LOAD_GLOBAL" and i.argval != None:
+                if (i.opname == "LOAD_NAME" or i.opname == "LOAD_GLOBAL") and i.argval != None:
                     m_ldgl(i.argval)
                 elif i.opname == "STORE_GLOBAL" and i.argval != None:
                     m_stgl(i.argval)
+                elif (i.opname == "DELETE_NAME" or i.opname == "DELETE_GLOBAL") and i.argval != None:
+                    m_ldgl(i.argval)
+                    m_clr()
                 elif i.opname == "LOAD_CONST" and i.argval != None:
                     m_ldstr(i.argval)
                 elif i.opname == "COMPARE_OP" and i.argval != None:
                     m_cmp()
                     m_cond(str(i.argval))
                     methcntr += 1
+                    # next instruction will be POP_JUMP_IF_FALSE, this is where we get jump address after if
+                    ix += 1
                     nbn = cbn() + "@" + str(methcntr) + "@if"
                     m_brp(nbn)
-                    make_meth((nbn, -1, str(i.argval)))
-                    ix += 1
+                    make_meth((nbn, dasm[ix].arg / 2, str(i.argval)))
                 elif i.opname == "JUMP_FORWARD" and i.argval != None:
                     cn = blocks[len(blocks) - 1][2]
                     while cn == "else":
                         # it's an else block, it skips parent now
-                        m_ret()
+                        m_iret()
                         blocks.pop()
                         cn = blocks[len(blocks) - 1][2]
                         nbn = cbn() + "@" + str(methcntr) + "@else"
-                    m_ret()
+                    m_iret()
                     cn = blocks[len(blocks) - 1][2]
                     blocks.pop()
                     nbn = cbn() + "@" + str(methcntr) + "@else"
@@ -221,14 +271,17 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
                     methcntr += 1
                     make_meth((nbn, ix + (i.arg / 2), "else"))
                 elif i.opname == "JUMP_ABSOLUTE" and i.argval != None:
-                    m_ret()
-                    cn = blocks[len(blocks) - 1][2]
-                    blocks.pop()
-                    m_cond_inv(cn)
-                    nbn = cbn() + "@" + str(methcntr) + "@else"
-                    m_brp(nbn)
-                    methcntr += 1
-                    make_meth((nbn, i.arg / 2, "else"))
+                    if i.argval / 2 < ix:
+                        pass
+                    else:
+                        m_iret()
+                        cn = blocks[len(blocks) - 1][2]
+                        blocks.pop()
+                        m_cond_inv(cn)
+                        nbn = cbn() + "@" + str(methcntr) + "@else"
+                        m_brp(nbn)
+                        methcntr += 1
+                        make_meth((nbn, i.arg / 2, "else"))
                 elif i.opname == "CALL_FUNCTION" or i.opname == "CALL_METHOD":
                     if buildClassNextPass:
                         meth[cbn()].pop()
@@ -255,8 +308,6 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
                             classMeth[buildClassName].append(i.argval)
                     else:
                         m_stgl(i.argval)
-                elif i.opname == "LOAD_NAME" and i.argval != None:
-                    m_ldgl(i.argval)
                 elif i.opname == "POP_TOP":
                     # m_spop() this is used only for returnless functions, so nada.
                     pass
@@ -276,6 +327,9 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
                     m_ldloc(i.argval)
                 elif i.opname == "STORE_FAST":
                     m_stloc(i.argval)
+                elif i.opname == "DELETE_FAST":
+                    m_ldloc(i.argval)
+                    m_clr()
                 elif i.opname == "STORE_ATTR":
                     if not str(i.argval) in attrIdx:
                         attrIdx[i.argval] = attrcntr
@@ -295,12 +349,65 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
                             attrIdx[i.argval] = attrcntr
                             attrcntr += 1
                         m_ldfld(attrIdx[i.argval])
+                elif i.opname == "DELETE_ATTR":
+                    if not str(i.argval) in attrIdx:
+                        attrIdx[i.argval] = attrcntr
+                        attrcntr += 1
+                    m_delfld(attrIdx[i.argval])
                 elif i.opname == "LOAD_BUILD_CLASS":
                     buildClassNextPass = True
-                elif i.opname == "BINARY_ADD":
+                elif i.opname == "INPLACE_ADD" or i.opname == "BINARY_ADD":
                     m_add()
-                elif i.opname == "INPLACE_ADD":
-                    m_add()
+                elif i.opname == "INPLACE_SUBTRACT" or i.opname == "BINARY_SUBTRACT":
+                    m_sub()
+                elif i.opname == "INPLACE_MULTIPLY" or i.opname == "BINARY_MULTIPLY":
+                    m_mul()
+                elif i.opname == "INPLACE_TRUE_DIVIDE" or i.opname == "BINARY_TRUE_DIVIDE" or i.opname == "INPLACE_FLOOR_DIVIDE" or i.opname == "BINARY_FLOOR_DIVIDE":
+                    m_div()
+                elif i.opname == "INPLACE_AND" or i.opname == "BINARY_AND":
+                    m_and()
+                elif i.opname == "INPLACE_OR" or i.opname == "BINARY_OR":
+                    m_or()
+                elif i.opname == "INPLACE_XOR" or i.opname == "BINARY_XOR":
+                    m_xor()
+                elif i.opname == "INPLACE_LSHIFT" or i.opname == "BINARY_LSHIFT":
+                    m_shl()
+                elif i.opname == "INPLACE_RSHIFT" or i.opname == "BINARY_RSHIFT":
+                    m_shr()
+                elif i.opname == "UNARY_NOT" or i.opname == "UNARY_INVERT":
+                    m_not()
+                elif i.opname == "INPLACE_POWER" or i.opname == "BINARY_POWER":
+                    m_pwr()
+                elif i.opname == "INPLACE_MODULO" or i.opname == "BINARY_MODULO":
+                    m_mod()
+                elif i.opname == "UNARY_POSITIVE":
+                    pass
+                elif i.opname == "UNARY_NEGATIVE":
+                    m_ldstr(-1)
+                    m_mul()
+                elif i.opname == "ROT_TWO":
+                    m_top(1)
+                elif i.opname == "ROT_THREE":
+                    m_top(2)
+                    m_top(2)
+                elif i.opname == "ROT_FOUR":
+                    m_top(3)
+                    m_top(3)
+                    m_top(3)
+                elif i.opname == "ROT_N":
+                    for x in range(0, i.arg - 1):
+                        m_top(i.arg - 1)
+                elif i.opname == "DUP_TOP":
+                    m_dup()
+                elif i.opname == "DUP_TOP_TWO":
+                    m_top(1)
+                    m_dup()
+                    m_top(2)
+                    m_dup()
+                    m_top(2)
+                    m_top(2)
+                elif i.opname == "GET_LEN":
+                    m_ldlen()
         else:
             if i == "init_label":
                 methcntr += 1
@@ -308,7 +415,7 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
         ix += 1
         if blocks[len(blocks) - 1][1] > -1:
             if ix > blocks[len(blocks) - 1][1]:
-                m_ret()
+                m_iret()
                 blocks.pop()
 
 def compile_file(file, out):
