@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Dialog</class>
+ <widget class="QDialog" name="Dialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>289</width>
+    <height>126</height>
+   </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>289</width>
+    <height>126</height>
+   </size>
+  </property>
+  <property name="maximumSize">
+   <size>
+    <width>289</width>
+    <height>126</height>
+   </size>
+  </property>
+  <property name="windowTitle">
+   <string>Select Font</string>
+  </property>
+  <widget class="QLabel" name="label">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>10</y>
+     <width>181</width>
+     <height>21</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Select font</string>
+   </property>
+  </widget>
+  <widget class="QComboBox" name="fontBox">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>40</y>
+     <width>271</width>
+     <height>31</height>
+    </rect>
+   </property>
+   <item>
+    <property name="text">
+     <string>Micro 4</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Micro 5</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Console 7</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Times New Roman 7</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Times New Roman 7 Bold</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Helvetica 8</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Helvetica 8 Bold</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Open Iconic 8</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Crox 9</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Crox 9 Bold</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Profont 9</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Times New Roman 10</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Times New Roman 10 Bold</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Console 10</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Profont 11</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Courier New 11</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Helvetica 11</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Helvetica 11 Bold</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Helvetica 12</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Helvetica 12 Thin</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Times New Roman 13</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Times New Roman 13 Bold</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Helvetica 14</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Inconsolata 16</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Logisoso 16</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Open Iconic 16</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Courier New 19</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Helvetica 19</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Inconsolata 19</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Battery 19</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Logisoso 20</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Logisoso 22</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Times New Roman 23</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Helvetica 25</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Helvetica 25 Bold</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Freedoom 26 Numbers</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Logisoso 26</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Logisoso 28</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Logisoso 32</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Open Iconic 32</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Logisoso 38</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Segments 42 Numbers</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Open Iconic 48</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>Open Iconic 64</string>
+    </property>
+   </item>
+  </widget>
+  <widget class="QDialogButtonBox" name="buttonBox">
+   <property name="geometry">
+    <rect>
+     <x>110</x>
+     <y>80</y>
+     <width>166</width>
+     <height>41</height>
+    </rect>
+   </property>
+   <property name="standardButtons">
+    <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+   </property>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
