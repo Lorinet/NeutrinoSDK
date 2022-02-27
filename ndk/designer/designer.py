@@ -228,18 +228,6 @@ app = QApplication(sys.argv)
 
 window = Designer()
 
-def message_box(message):
-    dlg = QDialog(window)
-    dlg.setWindowTitle("Notice")
-    dlg.layout = QVBoxLayout()
-    dlg.layout.addWidget(QLabel(message))
-    dlg.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok)
-    dlg.buttonBox.accepted.connect(dlg.accept)
-    dlg.layout.addWidget(dlg.buttonBox)
-    dlg.setLayout(dlg.layout)
-    dlg.setSizeGripEnabled(False)
-    dlg.exec()
-
 def about():
     aboutDialog = About()
     aboutDialog.exec_()
@@ -253,6 +241,8 @@ elements = [
     ]
 
 selection = 0
+currentFile = ""
+modified = False
 
 def update_preview():
     window.designTab.update()
@@ -305,61 +295,148 @@ def combo_select(index):
 def font_select():
     global selection
     global elements
+    global modified
     fontDialog = FontPicker()
     if fontDialog.exec():
         elements[selection].setProperty("Font", str(fontDialog.fontBox.currentText()))
+        modified = True
 
 def add_new_property():
     global selection
     global elements
+    global modified
     addProperty = AddProperty()
     if addProperty.exec():
         elements[selection].setProperty(str(addProperty.propertyBox.text()), str(addProperty.valueBox.text()))
-    select_element(selection)
+        modified = True
+        select_element(selection)
 
 def remove_property():
     global selection
     global elements
+    global modified
     row = window.propertyTable.currentIndex().row()
     if row > -1:
         del elements[selection].properties[window.propertyTable.item(row, 0).text()]
+        modified = True
         select_element(selection)
     else:
-        message_box("No property selected")
+        QMessageBox.warning(window, "Notice", "No property selected.", QMessageBox.OK)
 
 def add_new_element():
     global elements
+    global modified
     addElement = AddElement()
     addElement.idBox.setValue(find_vacant_id())
     if addElement.exec():
         elements.append(Element.with_id_type(str(addElement.idBox.value()), str(addElement.typeBox.currentText())))
+        modified = True
         load_elements()
 
 def remove_element():
     global selection
     global elements
+    global modified
     if elements[selection].getProperty("Type") == "WindowInfo":
-        message_box("WindowInfo elements cannot be removed.")
+        QMessageBox.warning(window, "Notice", "WindowInfo elements cannot be removed.", QMessageBox.OK)
     else:
         del elements[selection]
+        modified = True
     load_elements()
     
 def text_edit(prop):
     global selection
     global elements
+    global modified
     textEdit = TextEdit()
     textEdit.editPropertyLabel.text = "Edit " + prop
     textEdit.editField.document().setPlainText(elements[selection].getProperty(prop))
     if textEdit.exec():
         elements[selection].setProperty(prop, str(textEdit.editField.toPlainText()))
+        modified = True
 
 def list_edit(prop):
     global selection
     global elements
+    global modified
     listEdit = ListEdit()
     listEdit.editField.document().setPlainText(elements[selection].getProperty(prop).replace(',', '\n').replace('\\\n', '\\,'))
     if listEdit.exec():
         elements[selection].setProperty(prop, str(listEdit.editField.toPlainText()).replace('\n', ',') + ',')
+        modified = True
+
+def deserialize_view(code):
+    global selection
+    global elements
+    selection = 0
+    elements.clear()
+    cure = ""
+    escape = False
+    for i in range(len(code)):
+        if code[i] == '\\':
+            if escape:
+                escape = False
+            else:
+                escape = True
+                cure += '\\'
+                continue
+        elif code[i] == '|' and not escape:
+            elements.append(Element.deserialize(cure))
+            cure = ""
+        else:
+            escape = False
+            cure += code[i]
+    load_elements()
+
+def serialize_view():
+    global elements
+    ser = ""
+    for el in elements:
+        ser += el.serialize() + '|'
+    return ser
+
+def save_as():
+    global currentFile
+    global modified
+    currentFile = ""
+    modified = True
+    save_file()
+
+def save_file():
+    global currentFile
+    global modified
+    if currentFile == "":
+        currentFile, fltr = QFileDialog.getSaveFileName(window, "Save File", "", "Python source (*.py);;Neutrino IL source (*.ns);;Neutrino UI Design File (*.udf)")
+        selectedExt = re.search('\((.+?)\)', fltr).group(1).replace('*', '')
+        if not currentFile.endswith(selectedExt):
+            currentFile += selectedExt
+    content = ""
+    if currentFile.endswith(".udf"):
+        content = serialize_view()
+    elif currentFile.endswith(".ns"):
+        name = currentFile[0:-3]
+        content = "; " + name + " View Layout\n\n:" + name + "_CreateView\nspush \"" + serialize_view() + "\"\nleap WMCreateWindow\npop __" + name + "_hwnd ; Do not modify the handle variable!\npush __" + name + "_hwnd\nleap WMSetActiveWindow\nleap WMUpdateView\nret\n\n:" + name + "_DestroyView\npush __" + name + "_hwnd\nleap WMDestroyWindow\nret\n\n; Auto-generated with Neutrino UI Design Tool\n; #include " + name + ".ns\n"
+    with open(currentFile, "w") as f:
+        f.write(content)
+    modified = False
+
+def open_file():
+    global modified
+    ays = QMessageBox.warning(window, "Are you sure?", "The current document has been modified.\nAre you sure to open another file and discard unsaved changes?", QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel)
+    if ays == QMessageBox.Save:
+        save_file()
+    elif ays == QMessageBox.Cancel:
+        return
+    fileName = QFileDialog.getOpenFileName(window, "Open File", "", "Python source (*.py);;Neutrino IL source (*.ns);;Neutrino UI Design File (*.udf)")[0]
+    content = ""
+    with open(fileName, "r") as f:
+        content = f.readlines()
+    if fileName.endswith(".udf"):
+        deserialize_view(content[0])
+    elif fileName.endswith(".ns"):
+        for ln in content:
+            if ln.startswith("spush"):
+                deserialize_view(ln[7:-1])
 
 def property_edit(row, col):
     global selection
@@ -392,7 +469,6 @@ def draw_preview(event):
 
     pen = QPen(QColor.fromRgb(135, 255, 159), 1, Qt.SolidLine, Qt.SquareCap, Qt.MiterJoin)
     painter.setRenderHint(QPainter.Antialiasing, False)
-    #pen = QPen(QColor.fromRgb(255, 255, 255), 1, Qt.SolidLine, Qt.SquareCap, Qt.MiterJoin)
     painter.setPen(pen)
 
     for el in elements:
@@ -419,6 +495,10 @@ def draw_preview(event):
     painter.end()
 
 window.designTab.paintEvent = draw_preview
+
+window.actionOpen.triggered.connect(open_file)
+window.actionSave.triggered.connect(save_file)
+window.actionSave_As.triggered.connect(save_as)
 
 window.actionZoom.triggered.connect(update_preview)
 window.actionElementBoundaries.triggered.connect(update_preview)
