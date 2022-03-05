@@ -1,4 +1,3 @@
-# This Python file uses the following encoding: utf-8
 import sys
 import os
 import webbrowser
@@ -127,6 +126,19 @@ class DrawCanvas(QWidget):
         painter.setPen(pen)
         painter.drawRect(self.rect())
 
+selection = 0
+currentFile = ""
+modified = False
+
+def safe_quit():
+    global modified
+    if modified:
+        ays = QMessageBox.warning(window, "Are you sure?", "The current document has been modified.\nAre you sure to open another file and discard unsaved changes?", QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel)
+        if ays == QMessageBox.Save:
+            save_file()
+        elif ays == QMessageBox.Cancel:
+            return
+    QCoreApplication.instance().quit()
 
 class Designer(QMainWindow):
     def __init__(self):
@@ -160,6 +172,9 @@ class Designer(QMainWindow):
         self.propertyTable.setSelectionMode(QAbstractItemView.SingleSelection)
         self.designTab = self.findChild(QWidget, "designTab")
         self.show()
+    
+    def closeEvent(self, event):
+        safe_quit()
 
 class AddElement(QDialog):
     def __init__(self):
@@ -239,10 +254,6 @@ elements = [
     Element.deserialize("ID:0;Type:WindowInfo;Position X:-1;Position Y:-1;Width:128;Height:64;Title:Window;TitleBar:1;MaximizeButton:1;Hidden:0;Maximized:0;StickyDraw:0;WakeOnInteraction:0;"),
     Element.deserialize("ID:1;Position X:5;Position Y:2;Type:Label;Font:Helvetica 8;Text:Hello world;Checked:1;")
     ]
-
-selection = 0
-currentFile = ""
-modified = False
 
 def update_preview():
     window.designTab.update()
@@ -411,22 +422,25 @@ def save_file():
         if not currentFile.endswith(selectedExt):
             currentFile += selectedExt
     content = ""
+    name = os.path.basename(currentFile)[0:-3]
     if currentFile.endswith(".udf"):
         content = serialize_view()
     elif currentFile.endswith(".ns"):
-        name = currentFile[0:-3]
-        content = "; " + name + " View Layout\n\n:" + name + "_CreateView\nspush \"" + serialize_view() + "\"\nleap WMCreateWindow\npop __" + name + "_hwnd ; Do not modify the handle variable!\npush __" + name + "_hwnd\nleap WMSetActiveWindow\nleap WMUpdateView\nret\n\n:" + name + "_DestroyView\npush __" + name + "_hwnd\nleap WMDestroyWindow\nret\n\n; Auto-generated with Neutrino UI Design Tool\n; #include " + name + ".ns\n"
+        content = "; " + name + " View Layout\n\n:" + name + "_CreateView\nldstr \"" + serialize_view() + "\"\npushlx WMCreateWindow\nleap\npop __" + name + "_hwnd ; Do not modify the handle variable!\npush __" + name + "_hwnd\npushlx WMSetActiveWindow\nleap\npushlx WMUpdateView\nleap\nret\n\n:" + name + "_DestroyView\npush __" + name + "_hwnd\npushlx WMDestroyWindow\nleap\nret\n\n; Generated using Neutrino UI Designer\n; #include " + name + ".ns\n"
+    elif currentFile.endswith(".py"):
+        content = "# " + name + " View Layout\n# Generated using Neutrino UI Designer\n# import " + name + "\ndef " + name + "_create_view():\n\ttext = \"" + serialize_view() + "\"\n\tid = WMCreateWindow(text)\n\tWMSetActiveWindow(id)\n\tWMUpdateView()\n\treturn id\n"
     with open(currentFile, "w") as f:
         f.write(content)
     modified = False
 
 def open_file():
     global modified
-    ays = QMessageBox.warning(window, "Are you sure?", "The current document has been modified.\nAre you sure to open another file and discard unsaved changes?", QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel)
-    if ays == QMessageBox.Save:
-        save_file()
-    elif ays == QMessageBox.Cancel:
-        return
+    if modified:
+        ays = QMessageBox.warning(window, "Are you sure?", "The current document has been modified.\nAre you sure to open another file and discard unsaved changes?", QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel)
+        if ays == QMessageBox.Save:
+            save_file()
+        elif ays == QMessageBox.Cancel:
+            return
     fileName = QFileDialog.getOpenFileName(window, "Open File", "", "Python source (*.py);;Neutrino IL source (*.ns);;Neutrino UI Design File (*.udf)")[0]
     content = ""
     with open(fileName, "r") as f:
@@ -437,6 +451,10 @@ def open_file():
         for ln in content:
             if ln.startswith("spush"):
                 deserialize_view(ln[7:-1])
+    elif fileName.endswith(".py"):
+        for ln in content:
+            if ln.strip().startswith("text = "):
+                deserialize_view(ln.strip()[8:-1])
 
 def property_edit(row, col):
     global selection
@@ -499,6 +517,7 @@ window.designTab.paintEvent = draw_preview
 window.actionOpen.triggered.connect(open_file)
 window.actionSave.triggered.connect(save_file)
 window.actionSave_As.triggered.connect(save_as)
+window.actionExit.triggered.connect(safe_quit)
 
 window.actionZoom.triggered.connect(update_preview)
 window.actionElementBoundaries.triggered.connect(update_preview)
