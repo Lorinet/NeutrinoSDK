@@ -219,6 +219,28 @@ class TextEdit(QDialog):
         self.buttonBox.rejected.connect(self.reject)
         self.show()
 
+class ValueEdit(QDialog):
+    def __init__(self):
+        super(ValueEdit, self).__init__()
+        uic.loadUi("valueEdit.ui", self)
+        self.editBox = self.findChild(QSpinBox, "editBox")
+        self.editPropertyLabel = self.findChild(QLabel, "editPropertyLabel")
+        self.buttonBox = self.findChild(QDialogButtonBox, "buttonBox")
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+        self.show()
+
+class BoolEdit(QDialog):
+    def __init__(self):
+        super(BoolEdit, self).__init__()
+        uic.loadUi("boolEdit.ui", self)
+        self.comboBox = self.findChild(QComboBox, "comboBox")
+        self.editPropertyLabel = self.findChild(QLabel, "editPropertyLabel")
+        self.buttonBox = self.findChild(QDialogButtonBox, "buttonBox")
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+        self.show()
+
 class ListEdit(QDialog):
     def __init__(self):
         super(ListEdit, self).__init__()
@@ -250,10 +272,7 @@ def about():
 def documentation():
     webbrowser.open_new("https://lorinet.github.io/neutrinosdk/documentation")
 
-elements = [
-    Element.deserialize("ID:0;Type:WindowInfo;Position X:-1;Position Y:-1;Width:128;Height:64;Title:Window;TitleBar:1;MaximizeButton:1;Hidden:0;Maximized:0;StickyDraw:0;WakeOnInteraction:0;"),
-    Element.deserialize("ID:1;Position X:5;Position Y:2;Type:Label;Font:Helvetica 8;Text:Hello world;Checked:1;")
-    ]
+elements = []
 
 def update_preview():
     window.designTab.update()
@@ -293,6 +312,19 @@ def find_vacant_id():
         if found:
             return ix
         ix += 1
+
+def new_file():
+    global elements;
+    global modified
+    if modified:
+        ays = QMessageBox.warning(window, "Are you sure?", "The current document has been modified.\nAre you sure to open another file and discard unsaved changes?", QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel)
+        if ays == QMessageBox.Save:
+            save_file()
+        elif ays == QMessageBox.Cancel:
+            return
+    elements = [Element.deserialize("ID:0;Type:WindowInfo;Position X:-1;Position Y:-1;Width:128;Height:64;Title:Window;TitleBar:1;MaximizeButton:1;Hidden:0;Maximized:0;StickyDraw:0;WakeOnInteraction:0;")]
+    load_elements()
+    select_element(0)
 
 def list_select():
     ix = window.listView.currentRow()
@@ -364,6 +396,28 @@ def text_edit(prop):
     textEdit.editField.document().setPlainText(elements[selection].getProperty(prop))
     if textEdit.exec():
         elements[selection].setProperty(prop, str(textEdit.editField.toPlainText()))
+        modified = True
+
+def value_edit(prop):
+    global selection
+    global elements
+    global modified
+    valueEdit = ValueEdit()
+    valueEdit.editPropertyLabel.text = "Edit " + prop
+    valueEdit.editBox.setValue(int(elements[selection].getProperty(prop)))
+    if valueEdit.exec():
+        elements[selection].setProperty(prop, str(valueEdit.editBox.value()))
+        modified = True
+
+def bool_edit(prop):
+    global selection
+    global elements
+    global modified
+    boolEdit = BoolEdit()
+    boolEdit.editPropertyLabel.text = "Edit " + prop
+    boolEdit.comboBox.setCurrentIndex(int(elements[selection].getProperty(prop)) + 1)
+    if boolEdit.exec():
+        elements[selection].setProperty(prop, str(boolEdit.comboBox.currentIndex() - 1))
         modified = True
 
 def list_edit(prop):
@@ -464,6 +518,10 @@ def property_edit(row, col):
         font_select()
     elif prop == "Items":
         list_edit(prop)
+    elif prop in ["ID", "Width", "Height", "Position X", "Position Y"]:
+        value_edit(prop)
+    elif prop in ["WakeOnInteraction", "StickyDraw", "Border", "MaximizeButton", "Maximized", "Hidden", "TitleBar"]:
+        bool_edit(prop)
     else:
         text_edit(prop)
     select_element(selection)
@@ -514,6 +572,8 @@ def draw_preview(event):
 
 window.designTab.paintEvent = draw_preview
 
+
+window.actionNew.triggered.connect(new_file)
 window.actionOpen.triggered.connect(open_file)
 window.actionSave.triggered.connect(save_file)
 window.actionSave_As.triggered.connect(save_as)
@@ -534,6 +594,6 @@ window.removeSelectedProperty.clicked.connect(remove_property)
 window.addNewElement.clicked.connect(add_new_element)
 window.removeSelectedElement.clicked.connect(remove_element)
 
-load_elements()
+new_file()
 
 app.exec_()

@@ -26,7 +26,7 @@ OP_INDEX = 0x27
 OP_NEWOBJ = 0x2A
 OP_LDGLB = 0x2C
 OP_PUSHL = 0x30
-OP_SCMP = 0x31
+OP_CAST = 0x31
 OP_ADD = 0x40
 OP_SUB = 0x41
 OP_MUL = 0x42
@@ -468,6 +468,9 @@ for s in executedCode:
             pcode.extend(to_bytes(labels[arg[1].replace(":", "")]))
         else:
             rage_quit(9, "invalid label: " + arg[1])
+    elif op == "cast":
+        instr_simple(OP_CAST)
+        pcode.append(int(arg[1]))
     elif op == "add":
         instr_simple(OP_ADD)
     elif op == "sub":

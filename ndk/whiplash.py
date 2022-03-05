@@ -171,6 +171,9 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
     
     def m_parseint(cl):
         code_line('parseint', cl)
+    
+    def m_link(cl, lib):
+        code_line('link ' + str(lib), cl)
 
     def m_cond(operator, cl):
         if operator == "<":
@@ -333,11 +336,14 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
                         buildClassNextPass = False
                     else:
                         clbm = meth[cbn()][len(meth[cbn()]) - (i.argval + 1)][0].split(' ')
-                        if clbm[0] == "ldgl" and clbm[1] in ("str", "int"):
+                        if clbm[0] == "ldgl" and clbm[1] in ("str", "int", "load_library"):
+                            del meth[cbn()][len(meth[cbn()]) - (i.argval + 1)]
                             if clbm[1] == "str":
                                 m_tostr(ix)
                             elif clbm[1] == "int":
                                 m_parseint(ix)
+                            elif clbm[1] == "load_library":
+                                m_link(ix, meth[cbn()].pop()[0].split(' ')[1][1:-1])
                         else:
                             if i.argval > 0:
                                 m_top(i.argval, ix)
