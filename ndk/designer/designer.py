@@ -171,6 +171,11 @@ class Designer(QMainWindow):
         self.propertyTable.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.propertyTable.setSelectionMode(QAbstractItemView.SingleSelection)
         self.designTab = self.findChild(QWidget, "designTab")
+        self.saveShortcut = QShortcut(QKeySequence("Ctrl+S"), self)
+        self.saveAsShortcut = QShortcut(QKeySequence("Ctrl+Shift+S"), self)
+        self.quitShortcut = QShortcut(QKeySequence("Ctrl+Q"), self)
+        self.newShortcut = QShortcut(QKeySequence("Ctrl+N"), self)
+        self.openShortcut = QShortcut(QKeySequence("Ctrl+O"), self)
         self.show()
     
     def closeEvent(self, event):
@@ -314,14 +319,17 @@ def find_vacant_id():
         ix += 1
 
 def new_file():
-    global elements;
+    global elements
     global modified
+    global currentFile
     if modified:
         ays = QMessageBox.warning(window, "Are you sure?", "The current document has been modified.\nAre you sure to open another file and discard unsaved changes?", QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel)
         if ays == QMessageBox.Save:
             save_file()
         elif ays == QMessageBox.Cancel:
             return
+    currentFile = ""
+    modified = False
     elements = [Element.deserialize("ID:0;Type:WindowInfo;Position X:-1;Position Y:-1;Width:128;Height:64;Title:Window;TitleBar:1;MaximizeButton:1;Hidden:0;Maximized:0;StickyDraw:0;WakeOnInteraction:0;")]
     load_elements()
     select_element(0)
@@ -375,6 +383,7 @@ def add_new_element():
         elements.append(Element.with_id_type(str(addElement.idBox.value()), str(addElement.typeBox.currentText())))
         modified = True
         load_elements()
+        select_element(len(elements) - 1)
 
 def remove_element():
     global selection
@@ -578,6 +587,12 @@ window.actionOpen.triggered.connect(open_file)
 window.actionSave.triggered.connect(save_file)
 window.actionSave_As.triggered.connect(save_as)
 window.actionExit.triggered.connect(safe_quit)
+
+window.newShortcut.activated.connect(new_file)
+window.openShortcut.activated.connect(open_file)
+window.saveShortcut.activated.connect(save_file)
+window.saveAsShortcut.activated.connect(save_as)
+window.quitShortcut.activated.connect(safe_quit)
 
 window.actionZoom.triggered.connect(update_preview)
 window.actionElementBoundaries.triggered.connect(update_preview)

@@ -1,6 +1,7 @@
 import os
 import sys
 import dis
+import tempfile
 
 methcntr = 0
 meth = {}
@@ -34,7 +35,7 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
         glbPfx = "%" + label + "%"
 
     if len(sys.argv) > 3:
-        if sys.argv[3] == "-writePyCode":
+        if "-writePyCode" in sys.argv:
             pycode.write("\n" + label + ":\n")
 
     if label == 'main':
@@ -59,10 +60,7 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
         if isinstance(val, str):
             code_line('ldstr "' + str(val) + '"', cl)
         elif isinstance(val, int):
-            if val < 256:
-                code_line('ldb ' + str(val), cl)
-            else:
-                code_line('ldi ' + str(val), cl)
+            code_line('ldi ' + str(val), cl)
 
     def m_leap(cl):
         code_line('leap', cl)
@@ -172,6 +170,9 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
     def m_parseint(cl):
         code_line('parseint', cl)
     
+    def m_break(cl):
+        code_line('break', cl)
+    
     def m_link(cl, lib):
         code_line('link ' + str(lib), cl)
 
@@ -203,7 +204,7 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
         elif operator == ">=":
             code_line('iflt', cl)
     
-    code_line("swscop " + str(methcntr), -1)
+    #code_line("swscop " + str(methcntr), -1)
     args = code.co_varnames[:code.co_argcount]
     for r in reversed(range(len(args))):
         if r == 0 and initClass:
@@ -221,7 +222,7 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
         i = dasm[ix]
         if str(type(i)) == "<class 'dis.Instruction'>":
             if len(sys.argv) > 3:
-                if sys.argv[3] == "-writePyCode":
+                if "-writePyCode" in sys.argv:
                     #pycode.write(str(i) + '\n')
                     pycode.write(str(i.opname) + " " + str(i.arg) + " " + str(i.argval) + "\n")
             if str(type(i.argval)) == "<class 'code'>":
@@ -249,9 +250,14 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
                         # this is a dirty little hack to get class name from code object. subject to change.
                         m_pushl(str(i.argval.co_name), ix)
                         m_leap(ix)
-                    pycode.write("\nstill " + label + ":\n")
+                    if "-writePyCode" in sys.argv:
+                        pycode.write("\nstill " + label + ":\n")
             else:
-                if (i.opname == "LOAD_NAME" or i.opname == "LOAD_GLOBAL") and i.argval != None:
+                if i.opname == "IMPORT_NAME" and i.argval != None:
+                    fnm = str(i.argval) + ".py"
+                    with open(fnm, "r") as fo:
+                        process_code(compile(fo.read(), fnm, "exec"), str(i.argval))
+                elif (i.opname == "LOAD_NAME" or i.opname == "LOAD_GLOBAL") and i.argval != None:
                     m_ldgl(i.argval, ix)
                 elif i.opname == "STORE_GLOBAL" and i.argval != None:
                     m_stgl(i.argval, ix)
@@ -336,12 +342,14 @@ def process_code(code, label, buildClass=False, initClass=False, buildClassName=
                         buildClassNextPass = False
                     else:
                         clbm = meth[cbn()][len(meth[cbn()]) - (i.argval + 1)][0].split(' ')
-                        if clbm[0] == "ldgl" and clbm[1] in ("str", "int", "load_library"):
+                        if clbm[0] == "ldgl" and clbm[1] in ("str", "int", "load_library", "breakpoint"):
                             del meth[cbn()][len(meth[cbn()]) - (i.argval + 1)]
                             if clbm[1] == "str":
                                 m_tostr(ix)
                             elif clbm[1] == "int":
                                 m_parseint(ix)
+                            elif clbm[1] == "breakpoint":
+                                m_break(ix)
                             elif clbm[1] == "load_library":
                                 m_link(ix, meth[cbn()].pop()[0].split(' ')[1][1:-1])
                         else:
@@ -479,9 +487,9 @@ def compile_file(file, out):
     global asm
     global pycode
     if len(sys.argv) > 3:
-        if sys.argv[3] == "-writePyCode":
+        if "-writePyCode" in sys.argv:
             print("writing [pycode.txt]...")
-            pycode = open('pycode.txt', 'w')
+            pycode = open(file + "_pycode.txt", 'w')
     src = ""
     with open(file, 'r') as f:
         src = f.read()
@@ -489,7 +497,7 @@ def compile_file(file, out):
     process_code(bytecode, "main")
     asm = []
     asm.append("; " + file)
-    asm.append("; Compiled with Whiplash version 0.2")
+    asm.append("; Compiled with Whiplash version 0.3")
     asm.append("")
     for m in meth.keys():
         asm.append(":" + m)
@@ -510,10 +518,17 @@ def compile_file(file, out):
     for i in range(len(asm)):
         asm[i] += '\n'
     print("writing [" + out + "]...")
-    with open(out, 'w') as f:
-        f.writelines(asm)
+    if  "-il" in sys.argv:
+        with open(out, 'w') as f:
+            f.writelines(asm)
+    else:
+        with open(file + ".ns", 'w') as f:
+            f.writelines(asm)
+        os.system("python3 ntrasm.py " + file + ".ns " + out)
+        os.remove(file + ".ns")
+
     if len(sys.argv) > 3:
-        if sys.argv[3] == "-writePyCode":
+        if "-writePyCode" in sys.argv:
             pycode.close()
 
 print("Whiplash Python Compiler for NeutrinoOS")
